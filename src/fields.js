@@ -12,12 +12,12 @@ export function buildFilename({ unit, stayFromIso }) {
 }
 
 export function buildEmailSubject({ subjectCode, unit, stayFromLong, stayToLong }) {
-  return `${subjectCode}; GIS; ${unit}; ${stayFromLong}-${stayToLong}`;
+  return `${subjectCode}; room ${unit}; ${stayFromLong}-${stayToLong}`;
 }
 
 export function buildEmailBody({ ownerName, ownerMobile, unit, buildingName, stayFromLong, stayToLong, guestNames }) {
-  const guestLine = guestNames && guestNames.length ? guestNames.join(', ') : '';
-  return `Hi,\n\nPlease find attached the Guest Information Sheet for Unit ${unit}, ${buildingName}, along with the guests' valid IDs and signed house rules.\n\nGuests: ${guestLine}\nStay: ${stayFromLong} to ${stayToLong}\n\nThank you,\n${ownerName}\n${ownerMobile}`;
+  const guestList = (guestNames || []).map((name, i) => `${i + 1}. ${name}`).join('\n');
+  return `Hi,\n\nPlease find attached the Guest Information Sheet for Unit ${unit}, ${buildingName}, along with the guests' valid IDs and signed house rules.\n\nGuests: \n\n${guestList}\n\n\nStay: ${stayFromLong} to ${stayToLong}\n\nThank you,\n${ownerName}\n${ownerMobile}`;
 }
 
 export function missingGuestIds(guests) {

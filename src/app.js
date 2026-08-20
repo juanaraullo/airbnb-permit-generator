@@ -360,7 +360,7 @@ async function send() {
     ownerName: ownerNameEl.value.trim(),
     ownerMobile: ownerMobileEl.value.trim(),
     unit: unitSelect.value,
-    buildingName: building.name,
+    buildingName: `${building.name} ${building.tower}`,
     stayFromLong,
     stayToLong,
     guestNames: guests.map((g) => g.name),
