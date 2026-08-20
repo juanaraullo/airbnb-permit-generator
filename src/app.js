@@ -148,7 +148,8 @@ function collectAllIdFiles() {
 }
 
 import { fillGuestInfoSheet } from './filler.js';
-import { formatDateLong, parseIsoDateLocal, buildFilename } from './fields.js';
+import { formatDateLong, parseIsoDateLocal, buildFilename, buildEmailSubject, buildEmailBody } from './fields.js';
+import { canShareFiles, buildMailtoUrl } from './share.js';
 
 const stayFromEl = document.getElementById('stayFrom');
 const stayToEl = document.getElementById('stayTo');
@@ -215,6 +216,85 @@ generateBtn.addEventListener('click', () => {
     genStatus.className = 'status err';
   });
 });
+
+const sendStatus = document.getElementById('sendStatus');
+const emailBox = document.getElementById('emailBox');
+const adminEmailText = document.getElementById('adminEmailText');
+const subjectText = document.getElementById('subjectText');
+const copyAdminEmailBtn = document.getElementById('copyAdminEmailBtn');
+const copySubjectBtn = document.getElementById('copySubjectBtn');
+
+function downloadFile(bytesOrFile, filename) {
+  const blob = bytesOrFile instanceof Blob ? bytesOrFile : new Blob([bytesOrFile], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+async function send() {
+  sendStatus.textContent = '';
+  sendStatus.className = 'status';
+
+  if (!lastFilledPdfBytes) {
+    sendStatus.textContent = 'Generate the permit first.';
+    sendStatus.className = 'status err';
+    return;
+  }
+
+  const guests = collectGuests();
+  const missing = missingGuestIds(guests);
+  if (missing.length) {
+    sendStatus.textContent = `Missing ID photo for: ${missing.join(', ')}.`;
+    sendStatus.className = 'status err';
+    return;
+  }
+
+  const subject = buildEmailSubject({ unit: unitSelect.value, registeredGuest: registeredGuestEl.value.trim() });
+  const body = buildEmailBody({
+    ownerName: ownerNameEl.value.trim(),
+    ownerMobile: ownerMobileEl.value.trim(),
+    unit: unitSelect.value,
+    buildingName: building.name,
+    stayFromLong: formatDateLong(parseIsoDateLocal(stayFromEl.value)),
+    stayToLong: formatDateLong(parseIsoDateLocal(stayToEl.value)),
+  });
+
+  adminEmailText.textContent = building.adminEmail;
+  subjectText.textContent = subject;
+  emailBox.style.display = '';
+
+  const idFiles = collectAllIdFiles();
+  const pdfFile = new File([lastFilledPdfBytes], lastFilledFilename, { type: 'application/pdf' });
+
+  if (canShareFiles(navigator)) {
+    try {
+      await navigator.share({ files: [pdfFile, ...idFiles], title: subject, text: body });
+      sendStatus.textContent = 'Shared. Pick Mail, then paste in the subject/recipient shown below.';
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        sendStatus.textContent = 'Share failed: ' + err.message;
+        sendStatus.className = 'status err';
+      }
+    }
+  } else {
+    downloadFile(pdfFile, lastFilledFilename);
+    idFiles.forEach((file) => downloadFile(file, file.name));
+    window.location.href = buildMailtoUrl({ to: building.adminEmail, subject, body });
+    sendStatus.textContent = 'Downloaded the PDF and ID photos, and opened a Mail draft — attach the downloaded files.';
+  }
+}
+
+sendBtn.addEventListener('click', () => {
+  send().catch((err) => {
+    sendStatus.textContent = 'Something went wrong: ' + err.message;
+    sendStatus.className = 'status err';
+  });
+});
+
+copyAdminEmailBtn.addEventListener('click', () => navigator.clipboard.writeText(building.adminEmail));
+copySubjectBtn.addEventListener('click', () => navigator.clipboard.writeText(subjectText.textContent));
 
 populateUnits();
 resizeCanvas();
