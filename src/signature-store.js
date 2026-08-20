@@ -12,5 +12,10 @@ export function loadDefaults(storage) {
 }
 
 export function saveDefaults(defaults, storage) {
-  storage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+  } catch {
+    // localStorage can throw (quota exceeded, private browsing) — losing saved
+    // defaults is a minor inconvenience, not worth crashing the app over.
+  }
 }

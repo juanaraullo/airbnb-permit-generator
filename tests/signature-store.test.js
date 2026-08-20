@@ -29,3 +29,8 @@ test('loadDefaults recovers from corrupted stored JSON', () => {
   const loaded = loadDefaults(storage);
   assert.deepEqual(loaded, { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '' });
 });
+
+test('saveDefaults does not throw when storage.setItem fails', () => {
+  const storage = { getItem: () => null, setItem: () => { throw new Error('quota exceeded'); } };
+  assert.doesNotThrow(() => saveDefaults({ ownerName: 'x', ownerMobile: '', unit: '', signaturePngDataUrl: '' }, storage));
+});
