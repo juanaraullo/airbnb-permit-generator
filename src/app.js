@@ -303,3 +303,4 @@ loadSavedDefaults();
 ownerNameEl.addEventListener('change', persistDefaults);
 ownerMobileEl.addEventListener('change', persistDefaults);
 unitSelect.addEventListener('change', persistDefaults);
+addCompanionRow();
