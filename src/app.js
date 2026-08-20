@@ -22,16 +22,25 @@ function populateUnits() {
   }
 }
 
+// Resizes the canvas's backing bitmap to match its current CSS size at the
+// display's pixel ratio. Only actually touches the bitmap (which the canvas
+// spec always clears on any width/height assignment, even to an unchanged
+// value) when the target size has genuinely changed, so callers can tell
+// whether anything was actually reset. Returns true if it resized.
 function resizeCanvas() {
   const ratio = window.devicePixelRatio || 1;
   const rect = sigPad.getBoundingClientRect();
-  sigCtx.setTransform(1, 0, 0, 1, 0, 0);
-  sigPad.width = rect.width * ratio;
-  sigPad.height = rect.height * ratio;
+  const targetWidth = Math.round(rect.width * ratio);
+  const targetHeight = Math.round(rect.height * ratio);
+  if (sigPad.width === targetWidth && sigPad.height === targetHeight) return false;
+  sigPad.width = targetWidth;
+  sigPad.height = targetHeight;
   sigCtx.scale(ratio, ratio);
   sigCtx.lineWidth = 2;
   sigCtx.lineCap = 'round';
   sigCtx.strokeStyle = '#1c2130';
+  sigHasStrokes = false;
+  return true;
 }
 
 function pointFromEvent(evt) {
@@ -358,8 +367,13 @@ let resizeDebounce;
 window.addEventListener('resize', () => {
   clearTimeout(resizeDebounce);
   resizeDebounce = setTimeout(() => {
-    resizeCanvas();
-    sigHasStrokes = false;
-    invalidateGeneratedPdf();
+    // Only wipe an in-progress signature / invalidate a generated PDF when
+    // the canvas's drawable size actually changed — many resize events
+    // (on-screen keyboard opening, a mobile browser's address bar hiding,
+    // DevTools panel toggling) don't change sigPad's width and shouldn't
+    // discard a signature the host already drew.
+    if (resizeCanvas()) {
+      invalidateGeneratedPdf();
+    }
   }, 200);
 });
