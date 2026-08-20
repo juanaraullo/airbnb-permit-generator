@@ -44,6 +44,7 @@ function attachSignaturePad() {
   const start = (evt) => {
     drawing = true;
     sigHasStrokes = true;
+    invalidateGeneratedPdf();
     const { x, y } = pointFromEvent(evt);
     sigCtx.beginPath();
     sigCtx.moveTo(x, y);
@@ -68,6 +69,7 @@ function attachSignaturePad() {
   clearSigBtn.addEventListener('click', () => {
     sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
     sigHasStrokes = false;
+    invalidateGeneratedPdf();
   });
 }
 
@@ -97,14 +99,24 @@ function persistDefaults() {
   }, window.localStorage);
 }
 
-import { missingGuestIds } from './fields.js';
+import { missingGuestIds, formatDateLong, parseIsoDateLocal, buildFilename, buildEmailSubject, buildEmailBody } from './fields.js';
 
 const companionsList = document.getElementById('companionsList');
 const addCompanionBtn = document.getElementById('addCompanionBtn');
 const registeredGuestEl = document.getElementById('registeredGuest');
 const registeredGuestIdEl = document.getElementById('registeredGuestId');
 
+const MAX_COMPANION_ROWS = 5;
+
+function updateAddCompanionBtnState() {
+  addCompanionBtn.disabled = companionsList.querySelectorAll('.companion-row').length >= MAX_COMPANION_ROWS;
+}
+
 function addCompanionRow() {
+  if (companionsList.querySelectorAll('.companion-row').length >= MAX_COMPANION_ROWS) {
+    updateAddCompanionBtnState();
+    return;
+  }
   const row = document.createElement('div');
   row.className = 'companion-row';
   row.innerHTML = `
@@ -112,11 +124,20 @@ function addCompanionRow() {
     <input type="file" accept="image/*" capture="environment" class="companion-id">
     <button class="btn small" type="button" aria-label="Remove">✕</button>
   `;
-  row.querySelector('button').addEventListener('click', () => row.remove());
+  row.querySelector('button').addEventListener('click', () => {
+    row.remove();
+    updateAddCompanionBtnState();
+    invalidateGeneratedPdf();
+  });
   companionsList.appendChild(row);
+  updateAddCompanionBtnState();
+  invalidateGeneratedPdf();
 }
 
 addCompanionBtn.addEventListener('click', addCompanionRow);
+companionsList.addEventListener('input', (evt) => {
+  if (evt.target.classList.contains('companion-name')) invalidateGeneratedPdf();
+});
 
 function collectGuests() {
   const guests = [{
@@ -148,7 +169,6 @@ function collectAllIdFiles() {
 }
 
 import { fillGuestInfoSheet } from './filler.js';
-import { formatDateLong, parseIsoDateLocal, buildFilename, buildEmailSubject, buildEmailBody } from './fields.js';
 import { canShareFiles, buildMailtoUrl } from './share.js';
 
 const stayFromEl = document.getElementById('stayFrom');
@@ -160,6 +180,14 @@ const sendBtn = document.getElementById('sendBtn');
 
 let lastFilledPdfBytes = null;
 let lastFilledFilename = '';
+let currentPdfUrl = null;
+
+function invalidateGeneratedPdf() {
+  lastFilledPdfBytes = null;
+  lastFilledFilename = '';
+  sendBtn.disabled = true;
+  pdfDownloadLink.style.display = 'none';
+}
 
 async function generate() {
   genStatus.textContent = '';
@@ -199,8 +227,12 @@ async function generate() {
   lastFilledPdfBytes = outBytes;
   lastFilledFilename = buildFilename({ unit: unitSelect.value, stayFromIso: stayFromEl.value });
 
+  if (currentPdfUrl) {
+    URL.revokeObjectURL(currentPdfUrl);
+  }
   const blob = new Blob([outBytes], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
+  currentPdfUrl = url;
   pdfDownloadLink.href = url;
   pdfDownloadLink.download = lastFilledFilename;
   pdfDownloadLink.style.display = '';
@@ -239,6 +271,12 @@ async function send() {
 
   if (!lastFilledPdfBytes) {
     sendStatus.textContent = 'Generate the permit first.';
+    sendStatus.className = 'status err';
+    return;
+  }
+
+  if (!registeredGuestEl.value.trim() || !stayFromEl.value || !stayToEl.value) {
+    sendStatus.textContent = 'Guest name and both stay dates are required.';
     sendStatus.className = 'status err';
     return;
   }
@@ -303,4 +341,8 @@ loadSavedDefaults();
 ownerNameEl.addEventListener('change', persistDefaults);
 ownerMobileEl.addEventListener('change', persistDefaults);
 unitSelect.addEventListener('change', persistDefaults);
+registeredGuestEl.addEventListener('input', invalidateGeneratedPdf);
+stayFromEl.addEventListener('input', invalidateGeneratedPdf);
+stayToEl.addEventListener('input', invalidateGeneratedPdf);
+unitSelect.addEventListener('input', invalidateGeneratedPdf);
 addCompanionRow();
