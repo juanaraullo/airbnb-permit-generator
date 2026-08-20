@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Airbnb Permit Generator</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --border:#e3e6ee; --text:#1c2130; --muted:#6b7280;
+    --accent:#3454d1; --accent-dark:#2540a8; --accent-bg:#eef1ff;
+    --danger:#d64545; --ok:#1f9d55; --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.45;}
+  .wrap{max-width:640px; margin:0 auto; padding:24px 18px 80px;}
+  h1{font-size:19px; margin:0 0 2px;}
+  .sub{color:var(--muted); font-size:13px; margin:0 0 20px;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:16px;}
+  .card h2{font-size:14.5px; margin:0 0 12px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; font-weight:600; color:#3a3f52; margin-bottom:5px;}
+  .row{display:flex; gap:12px;}
+  .row .field{flex:1;}
+  input[type=text], input[type=date], input[type=tel], select{width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:#fff; color:var(--text); font-family:inherit;}
+  input:focus, select:focus{outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent);}
+  .companion-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .companion-row input[type=text]{flex:2;}
+  .companion-row input[type=file]{flex:2; font-size:12px;}
+  .companion-row button{flex:0 0 auto;}
+  button{font-family:inherit; cursor:pointer;}
+  .btn{padding:9px 16px; border-radius:9px; border:1px solid var(--border); background:#fff; font-size:13.5px; font-weight:600; color:var(--text);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .btn.small{padding:6px 10px; font-size:12.5px;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  canvas#sigPad{width:100%; height:130px; background:#fff; border:1px solid var(--border); border-radius:8px; touch-action:none; cursor:crosshair;}
+  .sig-actions{margin-top:8px;}
+  .status{font-size:13px; padding:8px 0; color:var(--ok);}
+  .status.err{color:var(--danger);}
+  .email-box{background:var(--accent-bg); border-radius:10px; padding:12px 14px; margin-top:12px; font-size:13px;}
+  .email-box .to{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  a.download-link{display:inline-block; margin-top:8px; font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Airbnb Permit Generator</h1>
+  <p class="sub">Uptown Parksuites — Guest Information Sheet</p>
+
+  <div class="card">
+    <h2>Booking</h2>
+    <div class="row">
+      <div class="field">
+        <label for="unitSelect">Unit</label>
+        <select id="unitSelect"></select>
+      </div>
+      <div class="field">
+        <label for="stayFrom">Stay from</label>
+        <input type="date" id="stayFrom">
+      </div>
+      <div class="field">
+        <label for="stayTo">Stay to</label>
+        <input type="date" id="stayTo">
+      </div>
+    </div>
+    <div class="field">
+      <label for="registeredGuest">Registered guest name</label>
+      <input type="text" id="registeredGuest" placeholder="Full name">
+    </div>
+    <div class="field">
+      <label for="registeredGuestId">Registered guest's ID photo</label>
+      <input type="file" id="registeredGuestId" accept="image/*" capture="environment">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Other companions <span style="font-weight:400;color:var(--muted)">(optional)</span></h2>
+    <div id="companionsList"></div>
+    <button class="btn small" id="addCompanionBtn" type="button">+ Add companion</button>
+  </div>
+
+  <div class="card">
+    <h2>Host</h2>
+    <div class="row">
+      <div class="field">
+        <label for="ownerName">Your name</label>
+        <input type="text" id="ownerName">
+      </div>
+      <div class="field">
+        <label for="ownerMobile">Your mobile</label>
+        <input type="tel" id="ownerMobile">
+      </div>
+    </div>
+    <div class="field">
+      <label>Signature</label>
+      <canvas id="sigPad" width="600" height="130"></canvas>
+      <div class="sig-actions">
+        <button class="btn small" id="clearSigBtn" type="button">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <button class="btn primary" id="generateBtn" type="button">Generate permit</button>
+    <div id="genStatus" class="status"></div>
+    <a id="pdfDownloadLink" class="download-link" style="display:none" download>Download filled PDF</a>
+  </div>
+
+  <div class="card">
+    <button class="btn primary" id="sendBtn" type="button" disabled>Send</button>
+    <div id="sendStatus" class="status"></div>
+    <div id="emailBox" class="email-box" style="display:none">
+      <div class="to">To: <span id="adminEmailText"></span> <button class="btn small" id="copyAdminEmailBtn" type="button">Copy</button></div>
+      <div>Subject: <span id="subjectText"></span> <button class="btn small" id="copySubjectBtn" type="button">Copy</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/pdf-lib.min.js"></script>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
