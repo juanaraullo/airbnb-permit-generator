@@ -97,6 +97,56 @@ function persistDefaults() {
   }, window.localStorage);
 }
 
+import { missingGuestIds } from './fields.js';
+
+const companionsList = document.getElementById('companionsList');
+const addCompanionBtn = document.getElementById('addCompanionBtn');
+const registeredGuestEl = document.getElementById('registeredGuest');
+const registeredGuestIdEl = document.getElementById('registeredGuestId');
+
+function addCompanionRow() {
+  const row = document.createElement('div');
+  row.className = 'companion-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Companion name" class="companion-name">
+    <input type="file" accept="image/*" capture="environment" class="companion-id">
+    <button class="btn small" type="button" aria-label="Remove">✕</button>
+  `;
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  companionsList.appendChild(row);
+}
+
+addCompanionBtn.addEventListener('click', addCompanionRow);
+
+function collectGuests() {
+  const guests = [{
+    name: registeredGuestEl.value.trim(),
+    hasId: !!(registeredGuestIdEl.files && registeredGuestIdEl.files[0]),
+  }];
+  companionsList.querySelectorAll('.companion-row').forEach((row) => {
+    const name = row.querySelector('.companion-name').value.trim();
+    if (!name) return; // an empty companion row is just unused, not a validation error
+    const hasId = !!(row.querySelector('.companion-id').files[0]);
+    guests.push({ name, hasId });
+  });
+  return guests;
+}
+
+function collectCompanionNames() {
+  return Array.from(companionsList.querySelectorAll('.companion-name'))
+    .map((el) => el.value.trim())
+    .filter(Boolean);
+}
+
+function collectAllIdFiles() {
+  const files = [];
+  if (registeredGuestIdEl.files[0]) files.push(registeredGuestIdEl.files[0]);
+  companionsList.querySelectorAll('.companion-id').forEach((input) => {
+    if (input.files[0]) files.push(input.files[0]);
+  });
+  return files;
+}
+
 populateUnits();
 resizeCanvas();
 attachSignaturePad();
