@@ -94,7 +94,7 @@
     </div>
     <div class="field">
       <label>Signature</label>
-      <canvas id="sigPad" width="600" height="130"></canvas>
+      <canvas id="sigPad" width="600" height="130" aria-label="Signature"></canvas>
       <div class="sig-actions">
         <button class="btn small" id="clearSigBtn" type="button">Clear</button>
       </div>
@@ -103,13 +103,13 @@
 
   <div class="card">
     <button class="btn primary" id="generateBtn" type="button">Generate permit</button>
-    <div id="genStatus" class="status"></div>
+    <div id="genStatus" class="status" aria-live="polite"></div>
     <a id="pdfDownloadLink" class="download-link" style="display:none" download>Download filled PDF</a>
   </div>
 
   <div class="card">
     <button class="btn primary" id="sendBtn" type="button" disabled>Send</button>
-    <div id="sendStatus" class="status"></div>
+    <div id="sendStatus" class="status" aria-live="polite"></div>
     <div id="emailBox" class="email-box" style="display:none">
       <div class="to">To: <span id="adminEmailText"></span> <button class="btn small" id="copyAdminEmailBtn" type="button">Copy</button></div>
       <div>Subject: <span id="subjectText"></span> <button class="btn small" id="copySubjectBtn" type="button">Copy</button></div>
