@@ -131,7 +131,7 @@ function addCompanionRow() {
   row.className = 'companion-row';
   row.innerHTML = `
     <input type="text" placeholder="Companion name" class="companion-name">
-    <input type="file" accept="image/*" capture="environment" class="companion-id">
+    <input type="file" accept="image/*" class="companion-id">
     <button class="btn small" type="button" aria-label="Remove">✕</button>
   `;
   row.querySelector('button').addEventListener('click', () => {
