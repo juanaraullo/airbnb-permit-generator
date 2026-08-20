@@ -16,7 +16,9 @@ export async function fillGuestInfoSheet(PDFLib, templateBytes, formConfig, data
   draw(data.stayTo, f.stayTo.x, f.stayTo.y, f.stayTo.size);
   draw(data.tower, f.tower.x, f.tower.y, f.tower.size);
   draw(data.unit, f.unit.x, f.unit.y, f.unit.size);
-  draw(`${data.ownerName} / ${data.dateSigned}`, f.ownerNameDate.x, f.ownerNameDate.y, f.ownerNameDate.size);
+  if (data.ownerName && data.dateSigned) {
+    draw(`${data.ownerName} / ${data.dateSigned}`, f.ownerNameDate.x, f.ownerNameDate.y, f.ownerNameDate.size);
+  }
 
   const rows = f.companionRows;
   (data.companions || []).slice(0, rows.max).forEach((name, i) => {

@@ -34,3 +34,43 @@ test('fillGuestInfoSheet places guest name, dates, unit, and companions at the c
   assert.ok(items.some((it) => it.text.includes('24J')), 'unit not found');
   assert.ok(items.some((it) => it.text.includes('Aug 25, 2026')), 'stay-to date not found');
 });
+
+test('fillGuestInfoSheet embeds and centers a signature image without throwing', async () => {
+  const templateBytes = readFileSync(new URL('../templates/uptown-guest-info.pdf', import.meta.url));
+  const sampleData = {
+    registeredGuest: 'Juan Dela Cruz',
+    stayFrom: 'Aug 20, 2026',
+    stayTo: 'Aug 25, 2026',
+    tower: 'Tower 2',
+    unit: '24J',
+    ownerName: 'Juan Araullo',
+    dateSigned: 'Aug 20, 2026',
+    companions: ['Maria Santos', 'Pedro Reyes'],
+  };
+
+  const signaturePngBytes = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC',
+    'base64'
+  );
+
+  const outBytesWithoutSignature = await fillGuestInfoSheet(PDFLib, templateBytes, BUILDINGS.uptown.form, sampleData);
+
+  const outBytesWithSignature = await fillGuestInfoSheet(PDFLib, templateBytes, BUILDINGS.uptown.form, {
+    ...sampleData,
+    signaturePngBytes,
+  });
+
+  assert.ok(outBytesWithSignature.length > 0, 'fill with signature returned no bytes');
+  assert.ok(
+    outBytesWithSignature.length > outBytesWithoutSignature.length,
+    `expected signature fill to produce more bytes than non-signature fill (with=${outBytesWithSignature.length}, without=${outBytesWithoutSignature.length})`
+  );
+
+  // Confirm the embedded image is actually present as an XObject in the page resources.
+  const reloadedDoc = await PDFLib.PDFDocument.load(outBytesWithSignature);
+  const page = reloadedDoc.getPages()[0];
+  const resources = page.node.Resources();
+  const xObjects = resources.lookup(PDFLib.PDFName.of('XObject'));
+  assert.ok(xObjects, 'no XObject dictionary found on page resources');
+  assert.ok(xObjects.keys().length > 0, 'no XObjects embedded on page (signature image not found)');
+});
