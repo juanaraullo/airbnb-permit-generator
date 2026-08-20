@@ -67,10 +67,24 @@ test('fillGuestInfoSheet embeds and centers a signature image without throwing',
   );
 
   // Confirm the embedded image is actually present as an XObject in the page resources.
+  // The template already ships 2 baked-in image XObjects (letterhead art), so an
+  // "XObject dict non-empty" check alone would pass even without a signature. Instead,
+  // compare XObject counts between the reloaded "without" and "with" signature docs and
+  // require exactly one additional XObject key for the signature image.
+  const reloadedDocWithoutSignature = await PDFLib.PDFDocument.load(outBytesWithoutSignature);
+  const pageWithoutSignature = reloadedDocWithoutSignature.getPages()[0];
+  const resourcesWithoutSignature = pageWithoutSignature.node.Resources();
+  const xObjectsWithoutSignature = resourcesWithoutSignature.lookup(PDFLib.PDFName.of('XObject'));
+  const xObjectCountWithoutSignature = xObjectsWithoutSignature ? xObjectsWithoutSignature.keys().length : 0;
+
   const reloadedDoc = await PDFLib.PDFDocument.load(outBytesWithSignature);
   const page = reloadedDoc.getPages()[0];
   const resources = page.node.Resources();
   const xObjects = resources.lookup(PDFLib.PDFName.of('XObject'));
   assert.ok(xObjects, 'no XObject dictionary found on page resources');
-  assert.ok(xObjects.keys().length > 0, 'no XObjects embedded on page (signature image not found)');
+  assert.equal(
+    xObjects.keys().length,
+    xObjectCountWithoutSignature + 1,
+    `expected exactly one additional XObject for the signature image (without=${xObjectCountWithoutSignature}, with=${xObjects.keys().length})`
+  );
 });
