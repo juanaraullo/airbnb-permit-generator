@@ -6,6 +6,7 @@ test('uptown building has the expected shape', () => {
   const uptown = BUILDINGS.uptown;
   assert.equal(uptown.name, 'Uptown Parksuites');
   assert.equal(uptown.tower, 'Tower 2');
+  assert.equal(uptown.subjectCode, 'UPS T2');
   assert.deepEqual(uptown.units, ['24J', '8T']);
   assert.equal(uptown.adminEmail, 'clientcare.uptownparksuites@asia-affinity.com');
   assert.equal(uptown.form.template, 'templates/uptown-guest-info.pdf');

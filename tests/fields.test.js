@@ -25,12 +25,17 @@ test('buildFilename includes unit and stay date, no illegal characters', () => {
   assert.equal(name, 'Guest Info Sheet - Unit 24J - 2026-08-20.pdf');
 });
 
-test('buildEmailSubject includes unit and guest name', () => {
-  const subject = buildEmailSubject({ unit: '24J', registeredGuest: 'Juan Dela Cruz' });
-  assert.equal(subject, 'Guest Information Sheet — Unit 24J — Juan Dela Cruz');
+test('buildEmailSubject follows the "CODE; GIS; unit; from-to" format', () => {
+  const subject = buildEmailSubject({
+    subjectCode: 'UPS T2',
+    unit: '24J',
+    stayFromLong: 'Aug 25, 2026',
+    stayToLong: 'Aug 30, 2026',
+  });
+  assert.equal(subject, 'UPS T2; GIS; 24J; Aug 25, 2026-Aug 30, 2026');
 });
 
-test('buildEmailBody includes stay dates and host contact', () => {
+test('buildEmailBody includes stay dates, host contact, and the guest name list', () => {
   const body = buildEmailBody({
     ownerName: 'Juan Araullo',
     ownerMobile: '0917 000 0000',
@@ -38,9 +43,11 @@ test('buildEmailBody includes stay dates and host contact', () => {
     buildingName: 'Uptown Parksuites',
     stayFromLong: 'Aug 20, 2026',
     stayToLong: 'Aug 25, 2026',
+    guestNames: ['Juan Dela Cruz', 'Maria Santos'],
   });
   assert.match(body, /Unit 24J, Uptown Parksuites/);
   assert.match(body, /Aug 20, 2026 to Aug 25, 2026/);
+  assert.match(body, /Juan Dela Cruz, Maria Santos/);
   assert.match(body, /Juan Araullo/);
   assert.match(body, /0917 000 0000/);
 });

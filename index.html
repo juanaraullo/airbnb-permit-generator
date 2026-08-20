@@ -35,7 +35,7 @@
   .btn.small{padding:6px 10px; font-size:12.5px;}
   .btn:disabled{opacity:.45; cursor:not-allowed;}
   canvas#sigPad{width:100%; height:130px; background:#fff; border:1px solid var(--border); border-radius:8px; touch-action:none; cursor:crosshair;}
-  .sig-actions{margin-top:8px;}
+  .sig-actions{margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;}
   .status{font-size:13px; padding:8px 0; color:var(--ok);}
   .status.err{color:var(--danger);}
   .email-box{background:var(--accent-bg); border-radius:10px; padding:12px 14px; margin-top:12px; font-size:13px;}
@@ -97,7 +97,17 @@
       <canvas id="sigPad" width="600" height="130" aria-label="Signature"></canvas>
       <div class="sig-actions">
         <button class="btn small" id="clearSigBtn" type="button">Clear</button>
+        <button class="btn small" id="uploadSigBtn" type="button">Upload signature image</button>
+        <input type="file" id="sigUpload" accept="image/*" style="display:none">
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Signed House Rules</h2>
+    <div class="field">
+      <label for="houseRulesPhoto">Photo of the guest-signed house rules</label>
+      <input type="file" id="houseRulesPhoto" accept="image/*">
     </div>
   </div>
 

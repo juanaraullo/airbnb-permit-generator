@@ -9,6 +9,8 @@ const ownerMobileEl = document.getElementById('ownerMobile');
 const sigPad = document.getElementById('sigPad');
 const sigCtx = sigPad.getContext('2d');
 const clearSigBtn = document.getElementById('clearSigBtn');
+const uploadSigBtn = document.getElementById('uploadSigBtn');
+const sigUpload = document.getElementById('sigUpload');
 
 let sigHasStrokes = false;
 
@@ -81,6 +83,45 @@ function attachSignaturePad() {
     sigHasStrokes = false;
     invalidateGeneratedPdf();
   });
+
+  uploadSigBtn.addEventListener('click', () => sigUpload.click());
+  sigUpload.addEventListener('change', () => {
+    const file = sigUpload.files[0];
+    if (file) loadSignatureImageFile(file);
+  });
+}
+
+// Draws an uploaded signature image onto the pad, scaled to fit while
+// preserving aspect ratio, so a host can use a consistent pre-made
+// e-signature instead of redrawing one by hand each time.
+function loadSignatureImageFile(file) {
+  const reader = new FileReader();
+  reader.onerror = () => {
+    genStatus.textContent = 'Could not read that signature image — please try a different file.';
+    genStatus.className = 'status err';
+  };
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => {
+      genStatus.textContent = 'That file doesn\'t look like a valid image — please try a different one.';
+      genStatus.className = 'status err';
+    };
+    img.onload = () => {
+      const ratio = window.devicePixelRatio || 1;
+      const boxW = sigPad.width / ratio;
+      const boxH = sigPad.height / ratio;
+      sigCtx.clearRect(0, 0, boxW, boxH);
+      const scale = Math.min(boxW / img.width, boxH / img.height, 1);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      sigCtx.drawImage(img, (boxW - w) / 2, (boxH - h) / 2, w, h);
+      sigHasStrokes = true;
+      invalidateGeneratedPdf();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  sigUpload.value = '';
 }
 
 function signaturePngBytes() {
@@ -115,6 +156,7 @@ const companionsList = document.getElementById('companionsList');
 const addCompanionBtn = document.getElementById('addCompanionBtn');
 const registeredGuestEl = document.getElementById('registeredGuest');
 const registeredGuestIdEl = document.getElementById('registeredGuestId');
+const houseRulesPhotoEl = document.getElementById('houseRulesPhoto');
 
 const MAX_COMPANION_ROWS = 5;
 
@@ -299,26 +341,41 @@ async function send() {
     return;
   }
 
-  const subject = buildEmailSubject({ unit: unitSelect.value, registeredGuest: registeredGuestEl.value.trim() });
+  if (!houseRulesPhotoEl.files[0]) {
+    sendStatus.textContent = 'Please attach a photo of the signed house rules.';
+    sendStatus.className = 'status err';
+    return;
+  }
+
+  const stayFromLong = formatDateLong(parseIsoDateLocal(stayFromEl.value));
+  const stayToLong = formatDateLong(parseIsoDateLocal(stayToEl.value));
+
+  const subject = buildEmailSubject({
+    subjectCode: building.subjectCode,
+    unit: unitSelect.value,
+    stayFromLong,
+    stayToLong,
+  });
   const body = buildEmailBody({
     ownerName: ownerNameEl.value.trim(),
     ownerMobile: ownerMobileEl.value.trim(),
     unit: unitSelect.value,
     buildingName: building.name,
-    stayFromLong: formatDateLong(parseIsoDateLocal(stayFromEl.value)),
-    stayToLong: formatDateLong(parseIsoDateLocal(stayToEl.value)),
+    stayFromLong,
+    stayToLong,
+    guestNames: guests.map((g) => g.name),
   });
 
   adminEmailText.textContent = building.adminEmail;
   subjectText.textContent = subject;
   emailBox.style.display = '';
 
-  const idFiles = collectAllIdFiles();
+  const attachments = [...collectAllIdFiles(), houseRulesPhotoEl.files[0]];
   const pdfFile = new File([lastFilledPdfBytes], lastFilledFilename, { type: 'application/pdf' });
 
   if (canShareFiles(navigator)) {
     try {
-      await navigator.share({ files: [pdfFile, ...idFiles], title: subject, text: body });
+      await navigator.share({ files: [pdfFile, ...attachments], title: subject, text: body });
       sendStatus.textContent = 'Shared. Pick Mail, then paste in the subject/recipient shown below.';
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -328,9 +385,9 @@ async function send() {
     }
   } else {
     downloadFile(pdfFile, lastFilledFilename);
-    idFiles.forEach((file) => downloadFile(file, file.name));
+    attachments.forEach((file) => downloadFile(file, file.name));
     window.location.href = buildMailtoUrl({ to: building.adminEmail, subject, body });
-    sendStatus.textContent = 'Downloaded the PDF and ID photos, and opened a Mail draft — attach the downloaded files.';
+    sendStatus.textContent = 'Downloaded the PDF, ID photos, and house rules photo, and opened a Mail draft — attach the downloaded files.';
   }
 }
 

@@ -2,6 +2,7 @@ export const BUILDINGS = {
   uptown: {
     name: 'Uptown Parksuites',
     tower: 'Tower 2',
+    subjectCode: 'UPS T2',
     units: ['24J', '8T'],
     adminEmail: 'clientcare.uptownparksuites@asia-affinity.com',
     form: {
