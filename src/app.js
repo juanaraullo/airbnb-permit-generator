@@ -147,6 +147,75 @@ function collectAllIdFiles() {
   return files;
 }
 
+import { fillGuestInfoSheet } from './filler.js';
+import { formatDateLong, parseIsoDateLocal, buildFilename } from './fields.js';
+
+const stayFromEl = document.getElementById('stayFrom');
+const stayToEl = document.getElementById('stayTo');
+const generateBtn = document.getElementById('generateBtn');
+const genStatus = document.getElementById('genStatus');
+const pdfDownloadLink = document.getElementById('pdfDownloadLink');
+const sendBtn = document.getElementById('sendBtn');
+
+let lastFilledPdfBytes = null;
+let lastFilledFilename = '';
+
+async function generate() {
+  genStatus.textContent = '';
+  genStatus.className = 'status';
+  sendBtn.disabled = true;
+
+  if (!registeredGuestEl.value.trim() || !stayFromEl.value || !stayToEl.value) {
+    genStatus.textContent = 'Guest name and both stay dates are required.';
+    genStatus.className = 'status err';
+    return;
+  }
+  const sigBytes = signaturePngBytes();
+  if (!sigBytes) {
+    genStatus.textContent = 'Please draw your signature first.';
+    genStatus.className = 'status err';
+    return;
+  }
+
+  const templateResp = await fetch(building.form.template);
+  const templateBytes = new Uint8Array(await templateResp.arrayBuffer());
+
+  const stayFromLong = formatDateLong(parseIsoDateLocal(stayFromEl.value));
+  const stayToLong = formatDateLong(parseIsoDateLocal(stayToEl.value));
+
+  const outBytes = await fillGuestInfoSheet(window.PDFLib, templateBytes, building.form, {
+    registeredGuest: registeredGuestEl.value.trim(),
+    stayFrom: stayFromLong,
+    stayTo: stayToLong,
+    tower: building.tower,
+    unit: unitSelect.value,
+    ownerName: ownerNameEl.value.trim(),
+    dateSigned: formatDateLong(new Date()),
+    companions: collectCompanionNames(),
+    signaturePngBytes: sigBytes,
+  });
+
+  lastFilledPdfBytes = outBytes;
+  lastFilledFilename = buildFilename({ unit: unitSelect.value, stayFromIso: stayFromEl.value });
+
+  const blob = new Blob([outBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  pdfDownloadLink.href = url;
+  pdfDownloadLink.download = lastFilledFilename;
+  pdfDownloadLink.style.display = '';
+
+  genStatus.textContent = `Generated "${lastFilledFilename}".`;
+  persistDefaults();
+  sendBtn.disabled = false;
+}
+
+generateBtn.addEventListener('click', () => {
+  generate().catch((err) => {
+    genStatus.textContent = 'Something went wrong generating the PDF: ' + err.message;
+    genStatus.className = 'status err';
+  });
+});
+
 populateUnits();
 resizeCanvas();
 attachSignaturePad();
