@@ -25,6 +25,7 @@ function populateUnits() {
 function resizeCanvas() {
   const ratio = window.devicePixelRatio || 1;
   const rect = sigPad.getBoundingClientRect();
+  sigCtx.setTransform(1, 0, 0, 1, 0, 0);
   sigPad.width = rect.width * ratio;
   sigPad.height = rect.height * ratio;
   sigCtx.scale(ratio, ratio);
@@ -335,7 +336,12 @@ copyAdminEmailBtn.addEventListener('click', () => navigator.clipboard.writeText(
 copySubjectBtn.addEventListener('click', () => navigator.clipboard.writeText(subjectText.textContent));
 
 populateUnits();
-resizeCanvas();
+// Defer the initial measurement two frames so it runs after the browser's
+// first layout pass has settled — measuring immediately can catch the
+// canvas mid-layout (e.g. during a container/viewport still resizing) and
+// permanently lock in a too-small drawing buffer, since there's no other
+// trigger to re-measure until a later window resize.
+requestAnimationFrame(() => requestAnimationFrame(resizeCanvas));
 attachSignaturePad();
 loadSavedDefaults();
 ownerNameEl.addEventListener('change', persistDefaults);
@@ -347,3 +353,13 @@ stayToEl.addEventListener('input', invalidateGeneratedPdf);
 unitSelect.addEventListener('input', invalidateGeneratedPdf);
 ownerNameEl.addEventListener('input', invalidateGeneratedPdf);
 addCompanionRow();
+
+let resizeDebounce;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeDebounce);
+  resizeDebounce = setTimeout(() => {
+    resizeCanvas();
+    sigHasStrokes = false;
+    invalidateGeneratedPdf();
+  }, 200);
+});
