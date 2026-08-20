@@ -345,4 +345,5 @@ registeredGuestEl.addEventListener('input', invalidateGeneratedPdf);
 stayFromEl.addEventListener('input', invalidateGeneratedPdf);
 stayToEl.addEventListener('input', invalidateGeneratedPdf);
 unitSelect.addEventListener('input', invalidateGeneratedPdf);
+ownerNameEl.addEventListener('input', invalidateGeneratedPdf);
 addCompanionRow();
