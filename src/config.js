@@ -16,7 +16,7 @@ export const BUILDINGS = {
         tower: { x: 124, y: 305, size: 9 },
         unit: { x: 229, y: 305, size: 9 },
         ownerNameDate: { x: 210, y: 244, size: 9 },
-        signature: { x: 195, y: 246, w: 225, h: 32 },
+        signature: { x: 195, y: 256, w: 225, h: 26 },
         companionRows: { x: 90, startY: 563, rowH: 19, max: 5, size: 9 },
       },
     },

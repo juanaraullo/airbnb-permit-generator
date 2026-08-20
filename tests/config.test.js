@@ -16,5 +16,5 @@ test('uptown field coordinates match the calibrated values', () => {
   const f = BUILDINGS.uptown.form.fields;
   assert.deepEqual(f.registeredGuest, { x: 197, y: 855, size: 10 });
   assert.deepEqual(f.companionRows, { x: 90, startY: 563, rowH: 19, max: 5, size: 9 });
-  assert.deepEqual(f.signature, { x: 195, y: 246, w: 225, h: 32 });
+  assert.deepEqual(f.signature, { x: 195, y: 256, w: 225, h: 26 });
 });

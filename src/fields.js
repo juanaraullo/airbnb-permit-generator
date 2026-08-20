@@ -16,8 +16,29 @@ export function buildEmailSubject({ subjectCode, unit, stayFromLong, stayToLong 
 }
 
 export function buildEmailBody({ ownerName, ownerMobile, unit, buildingName, stayFromLong, stayToLong, guestNames }) {
-  const guestList = (guestNames || []).map((name, i) => `${i + 1}. ${name}`).join('\n');
-  return `Hi,\n\nPlease find attached the Guest Information Sheet for Unit ${unit}, ${buildingName}, along with the guests' valid IDs and signed house rules.\n\nGuests: \n\n${guestList}\n\n\nStay: ${stayFromLong} to ${stayToLong}\n\nThank you,\n${ownerName}\n${ownerMobile}`;
+  // \r\n rather than a bare \n: several mail apps' iOS share extensions
+  // (observed with Gmail) collapse single-\n line breaks in shared plain
+  // text into spaces, running every line into one paragraph. CRLF is the
+  // line ending plain-text mail bodies use per RFC 5322 and is preserved
+  // reliably where bare \n isn't.
+  const NL = '\r\n';
+  const guestList = (guestNames || []).map((name, i) => `${i + 1}. ${name}`).join(NL);
+  return [
+    'Hi,',
+    '',
+    `Please find attached the Guest Information Sheet for Unit ${unit}, ${buildingName}, along with the guests' valid IDs and signed house rules.`,
+    '',
+    'Guests: ',
+    '',
+    guestList,
+    '',
+    '',
+    `Stay: ${stayFromLong} to ${stayToLong}`,
+    '',
+    'Thank you,',
+    ownerName,
+    ownerMobile,
+  ].join(NL);
 }
 
 export function missingGuestIds(guests) {

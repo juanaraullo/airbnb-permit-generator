@@ -41,6 +41,7 @@
   .status.err{color:var(--danger);}
   .email-box{background:var(--accent-bg); border-radius:10px; padding:12px 14px; margin-top:12px; font-size:13px;}
   .email-box .to{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .email-box .note{color:var(--muted); font-size:12px; margin-top:8px;}
   a.download-link{display:inline-block; margin-top:8px; font-size:13px;}
 </style>
 </head>
@@ -124,6 +125,7 @@
     <div id="emailBox" class="email-box" style="display:none">
       <div class="to">To: <span id="adminEmailText"></span> <button class="btn small" id="copyAdminEmailBtn" type="button">Copy</button></div>
       <div>Subject: <span id="subjectText"></span> <button class="btn small" id="copySubjectBtn" type="button">Copy</button></div>
+      <div class="note">If the mail app you shared to got the subject or spacing wrong, tap Copy and paste it in yourself: <button class="btn small" id="copyBodyBtn" type="button">Copy body</button></div>
     </div>
   </div>
 </div>

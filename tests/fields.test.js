@@ -51,7 +51,7 @@ test('buildEmailBody includes stay dates, host contact, and a numbered guest lis
   assert.match(body, /0917 000 0000/);
   assert.equal(
     body,
-    "Hi,\n\nPlease find attached the Guest Information Sheet for Unit 24J, Uptown Parksuites Tower 2, along with the guests' valid IDs and signed house rules.\n\nGuests: \n\n1. Juan Dela Cruz\n2. Maria Santos\n\n\nStay: Aug 20, 2026 to Aug 25, 2026\n\nThank you,\nJuan Araullo\n0917 000 0000"
+    "Hi,\r\n\r\nPlease find attached the Guest Information Sheet for Unit 24J, Uptown Parksuites Tower 2, along with the guests' valid IDs and signed house rules.\r\n\r\nGuests: \r\n\r\n1. Juan Dela Cruz\r\n2. Maria Santos\r\n\r\n\r\nStay: Aug 20, 2026 to Aug 25, 2026\r\n\r\nThank you,\r\nJuan Araullo\r\n0917 000 0000"
   );
 });
 

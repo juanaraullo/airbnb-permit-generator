@@ -307,6 +307,9 @@ const adminEmailText = document.getElementById('adminEmailText');
 const subjectText = document.getElementById('subjectText');
 const copyAdminEmailBtn = document.getElementById('copyAdminEmailBtn');
 const copySubjectBtn = document.getElementById('copySubjectBtn');
+const copyBodyBtn = document.getElementById('copyBodyBtn');
+
+let lastEmailBody = '';
 
 function downloadFile(bytesOrFile, filename) {
   const blob = bytesOrFile instanceof Blob ? bytesOrFile : new Blob([bytesOrFile], { type: 'application/pdf' });
@@ -368,14 +371,21 @@ async function send() {
 
   adminEmailText.textContent = building.adminEmail;
   subjectText.textContent = subject;
+  lastEmailBody = body;
   emailBox.style.display = '';
 
   const attachments = [...collectAllIdFiles(), houseRulesPhotoEl.files[0]];
-  const pdfFile = new File([lastFilledPdfBytes], lastFilledFilename, { type: 'application/pdf' });
 
   if (canShareFiles(navigator)) {
+    // Some mail apps' iOS share extensions (observed with Gmail) ignore the
+    // Web Share API's `title` and instead auto-fill the email subject from
+    // the shared PDF's own filename. Naming the shared file after the
+    // subject itself makes that fallback behavior produce the right
+    // subject too, without affecting the separate, human-friendly filename
+    // used for the direct-download link/fallback path below.
+    const sharePdfFile = new File([lastFilledPdfBytes], `${subject}.pdf`, { type: 'application/pdf' });
     try {
-      await navigator.share({ files: [pdfFile, ...attachments], title: subject, text: body });
+      await navigator.share({ files: [sharePdfFile, ...attachments], title: subject, text: body });
       sendStatus.textContent = 'Shared. Pick Mail, then paste in the subject/recipient shown below.';
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -384,7 +394,7 @@ async function send() {
       }
     }
   } else {
-    downloadFile(pdfFile, lastFilledFilename);
+    downloadFile(lastFilledPdfBytes, lastFilledFilename);
     attachments.forEach((file) => downloadFile(file, file.name));
     window.location.href = buildMailtoUrl({ to: building.adminEmail, subject, body });
     sendStatus.textContent = 'Downloaded the PDF, ID photos, and house rules photo, and opened a Mail draft — attach the downloaded files.';
@@ -400,6 +410,7 @@ sendBtn.addEventListener('click', () => {
 
 copyAdminEmailBtn.addEventListener('click', () => navigator.clipboard.writeText(building.adminEmail));
 copySubjectBtn.addEventListener('click', () => navigator.clipboard.writeText(subjectText.textContent));
+copyBodyBtn.addEventListener('click', () => navigator.clipboard.writeText(lastEmailBody));
 
 populateUnits();
 // Defer the initial measurement two frames so it runs after the browser's
