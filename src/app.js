@@ -56,7 +56,7 @@ function attachSignaturePad() {
   const start = (evt) => {
     drawing = true;
     sigHasStrokes = true;
-    invalidateGeneratedPdf();
+    invalidateGeneratedPermit();
     const { x, y } = pointFromEvent(evt);
     sigCtx.beginPath();
     sigCtx.moveTo(x, y);
@@ -81,7 +81,7 @@ function attachSignaturePad() {
   clearSigBtn.addEventListener('click', () => {
     sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
     sigHasStrokes = false;
-    invalidateGeneratedPdf();
+    invalidateGeneratedPermit();
   });
 
   uploadSigBtn.addEventListener('click', () => sigUpload.click());
@@ -116,7 +116,7 @@ function loadSignatureImageFile(file) {
       const h = img.height * scale;
       sigCtx.drawImage(img, (boxW - w) / 2, (boxH - h) / 2, w, h);
       sigHasStrokes = true;
-      invalidateGeneratedPdf();
+      invalidateGeneratedPermit();
     };
     img.src = reader.result;
   };
@@ -150,13 +150,21 @@ function persistDefaults() {
   }, window.localStorage);
 }
 
-import { missingGuestIds, formatDateLong, parseIsoDateLocal, buildFilename, buildEmailSubject, buildEmailBody } from './fields.js';
+import { attachmentsShortfall, formatDateLong, parseIsoDateLocal, buildFilename, buildEmailSubject, buildEmailBody } from './fields.js';
 
 const companionsList = document.getElementById('companionsList');
 const addCompanionBtn = document.getElementById('addCompanionBtn');
 const registeredGuestEl = document.getElementById('registeredGuest');
-const registeredGuestIdEl = document.getElementById('registeredGuestId');
-const houseRulesPhotoEl = document.getElementById('houseRulesPhoto');
+const attachmentsInputEl = document.getElementById('attachmentsInput');
+const attachmentsSummaryEl = document.getElementById('attachmentsSummary');
+
+function updateAttachmentsSummary() {
+  const count = attachmentsInputEl.files.length;
+  attachmentsSummaryEl.textContent = count
+    ? `${count} photo${count === 1 ? '' : 's'} selected.`
+    : '';
+}
+attachmentsInputEl.addEventListener('change', updateAttachmentsSummary);
 
 const MAX_COMPANION_ROWS = 5;
 
@@ -173,37 +181,22 @@ function addCompanionRow() {
   row.className = 'companion-row';
   row.innerHTML = `
     <input type="text" placeholder="Companion name" class="companion-name">
-    <input type="file" accept="image/*" class="companion-id">
     <button class="btn small" type="button" aria-label="Remove">✕</button>
   `;
   row.querySelector('button').addEventListener('click', () => {
     row.remove();
     updateAddCompanionBtnState();
-    invalidateGeneratedPdf();
+    invalidateGeneratedPermit();
   });
   companionsList.appendChild(row);
   updateAddCompanionBtnState();
-  invalidateGeneratedPdf();
+  invalidateGeneratedPermit();
 }
 
 addCompanionBtn.addEventListener('click', addCompanionRow);
 companionsList.addEventListener('input', (evt) => {
-  if (evt.target.classList.contains('companion-name')) invalidateGeneratedPdf();
+  if (evt.target.classList.contains('companion-name')) invalidateGeneratedPermit();
 });
-
-function collectGuests() {
-  const guests = [{
-    name: registeredGuestEl.value.trim(),
-    hasId: !!(registeredGuestIdEl.files && registeredGuestIdEl.files[0]),
-  }];
-  companionsList.querySelectorAll('.companion-row').forEach((row) => {
-    const name = row.querySelector('.companion-name').value.trim();
-    if (!name) return; // an empty companion row is just unused, not a validation error
-    const hasId = !!(row.querySelector('.companion-id').files[0]);
-    guests.push({ name, hasId });
-  });
-  return guests;
-}
 
 function collectCompanionNames() {
   return Array.from(companionsList.querySelectorAll('.companion-name'))
@@ -211,34 +204,46 @@ function collectCompanionNames() {
     .filter(Boolean);
 }
 
-function collectAllIdFiles() {
-  const files = [];
-  if (registeredGuestIdEl.files[0]) files.push(registeredGuestIdEl.files[0]);
-  companionsList.querySelectorAll('.companion-id').forEach((input) => {
-    if (input.files[0]) files.push(input.files[0]);
-  });
-  return files;
+function collectGuestNames() {
+  const name = registeredGuestEl.value.trim();
+  return name ? [name, ...collectCompanionNames()] : collectCompanionNames();
 }
 
 import { fillGuestInfoSheet } from './filler.js';
+import { renderPdfPageToPngBlob } from './render.js';
 import { canShareFiles, buildMailtoUrl } from './share.js';
 
 const stayFromEl = document.getElementById('stayFrom');
 const stayToEl = document.getElementById('stayTo');
 const generateBtn = document.getElementById('generateBtn');
 const genStatus = document.getElementById('genStatus');
-const pdfDownloadLink = document.getElementById('pdfDownloadLink');
+const downloadLink = document.getElementById('pdfDownloadLink');
 const sendBtn = document.getElementById('sendBtn');
 
-let lastFilledPdfBytes = null;
+let lastGeneratedImageBlob = null;
 let lastFilledFilename = '';
-let currentPdfUrl = null;
+let currentImageUrl = null;
+let pdfjsLibPromise = null;
 
-function invalidateGeneratedPdf() {
-  lastFilledPdfBytes = null;
+// pdf.js is only needed once the host actually generates a permit, and it's
+// a large module (~400KB minified) — load it lazily on first use rather
+// than blocking initial page load, and cache the import so repeated
+// Generate clicks in one session don't re-fetch it.
+function loadPdfjs() {
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = import('../vendor/pdfjs/pdf.min.mjs').then((pdfjsLib) => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
+      return pdfjsLib;
+    });
+  }
+  return pdfjsLibPromise;
+}
+
+function invalidateGeneratedPermit() {
+  lastGeneratedImageBlob = null;
   lastFilledFilename = '';
   sendBtn.disabled = true;
-  pdfDownloadLink.style.display = 'none';
+  downloadLink.style.display = 'none';
 }
 
 async function generate() {
@@ -258,13 +263,15 @@ async function generate() {
     return;
   }
 
+  genStatus.textContent = 'Generating…';
+
   const templateResp = await fetch(building.form.template);
   const templateBytes = new Uint8Array(await templateResp.arrayBuffer());
 
   const stayFromLong = formatDateLong(parseIsoDateLocal(stayFromEl.value));
   const stayToLong = formatDateLong(parseIsoDateLocal(stayToEl.value));
 
-  const outBytes = await fillGuestInfoSheet(window.PDFLib, templateBytes, building.form, {
+  const filledPdfBytes = await fillGuestInfoSheet(window.PDFLib, templateBytes, building.form, {
     registeredGuest: registeredGuestEl.value.trim(),
     stayFrom: stayFromLong,
     stayTo: stayToLong,
@@ -276,18 +283,23 @@ async function generate() {
     signaturePngBytes: sigBytes,
   });
 
-  lastFilledPdfBytes = outBytes;
+  const pdfjsLib = await loadPdfjs();
+  // scale:2 renders at roughly print resolution (the template is a US
+  // Legal page, 612x1008pt -> ~1224x2016px at scale 2) so the photo stays
+  // sharp and legible, not blurry when the admin views/prints it.
+  const imageBlob = await renderPdfPageToPngBlob(pdfjsLib, filledPdfBytes, 2);
+
+  lastGeneratedImageBlob = imageBlob;
   lastFilledFilename = buildFilename({ unit: unitSelect.value, stayFromIso: stayFromEl.value });
 
-  if (currentPdfUrl) {
-    URL.revokeObjectURL(currentPdfUrl);
+  if (currentImageUrl) {
+    URL.revokeObjectURL(currentImageUrl);
   }
-  const blob = new Blob([outBytes], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  currentPdfUrl = url;
-  pdfDownloadLink.href = url;
-  pdfDownloadLink.download = lastFilledFilename;
-  pdfDownloadLink.style.display = '';
+  const url = URL.createObjectURL(imageBlob);
+  currentImageUrl = url;
+  downloadLink.href = url;
+  downloadLink.download = lastFilledFilename;
+  downloadLink.style.display = '';
 
   genStatus.textContent = `Generated "${lastFilledFilename}".`;
   persistDefaults();
@@ -296,7 +308,7 @@ async function generate() {
 
 generateBtn.addEventListener('click', () => {
   generate().catch((err) => {
-    genStatus.textContent = 'Something went wrong generating the PDF: ' + err.message;
+    genStatus.textContent = 'Something went wrong generating the permit: ' + err.message;
     genStatus.className = 'status err';
   });
 });
@@ -312,7 +324,7 @@ const copyBodyBtn = document.getElementById('copyBodyBtn');
 let lastEmailBody = '';
 
 function downloadFile(bytesOrFile, filename) {
-  const blob = bytesOrFile instanceof Blob ? bytesOrFile : new Blob([bytesOrFile], { type: 'application/pdf' });
+  const blob = bytesOrFile instanceof Blob ? bytesOrFile : new Blob([bytesOrFile], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
@@ -324,7 +336,7 @@ async function send() {
   sendStatus.textContent = '';
   sendStatus.className = 'status';
 
-  if (!lastFilledPdfBytes) {
+  if (!lastGeneratedImageBlob) {
     sendStatus.textContent = 'Generate the permit first.';
     sendStatus.className = 'status err';
     return;
@@ -336,16 +348,11 @@ async function send() {
     return;
   }
 
-  const guests = collectGuests();
-  const missing = missingGuestIds(guests);
-  if (missing.length) {
-    sendStatus.textContent = `Missing ID photo for: ${missing.join(', ')}.`;
-    sendStatus.className = 'status err';
-    return;
-  }
-
-  if (!houseRulesPhotoEl.files[0]) {
-    sendStatus.textContent = 'Please attach a photo of the signed house rules.';
+  const guestNames = collectGuestNames();
+  const attachments = Array.from(attachmentsInputEl.files);
+  const shortfall = attachmentsShortfall(guestNames.length, attachments.length);
+  if (shortfall > 0) {
+    sendStatus.textContent = `Select ${shortfall} more photo${shortfall === 1 ? '' : 's'} — you need one ID photo per guest (${guestNames.length}) plus the signed house rules.`;
     sendStatus.className = 'status err';
     return;
   }
@@ -366,7 +373,7 @@ async function send() {
     buildingName: `${building.name} ${building.tower}`,
     stayFromLong,
     stayToLong,
-    guestNames: guests.map((g) => g.name),
+    guestNames,
   });
 
   adminEmailText.textContent = building.adminEmail;
@@ -374,18 +381,16 @@ async function send() {
   lastEmailBody = body;
   emailBox.style.display = '';
 
-  const attachments = [...collectAllIdFiles(), houseRulesPhotoEl.files[0]];
-
   if (canShareFiles(navigator)) {
     // Some mail apps' iOS share extensions (observed with Gmail) ignore the
     // Web Share API's `title` and instead auto-fill the email subject from
-    // the shared PDF's own filename. Naming the shared file after the
+    // the shared file's own filename. Naming the shared image after the
     // subject itself makes that fallback behavior produce the right
     // subject too, without affecting the separate, human-friendly filename
     // used for the direct-download link/fallback path below.
-    const sharePdfFile = new File([lastFilledPdfBytes], `${subject}.pdf`, { type: 'application/pdf' });
+    const shareImageFile = new File([lastGeneratedImageBlob], `${subject}.png`, { type: 'image/png' });
     try {
-      await navigator.share({ files: [sharePdfFile, ...attachments], title: subject, text: body });
+      await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: body });
       // Several mail apps' share extensions (observed with Gmail on iOS)
       // collapse every line break in the shared text into a single space,
       // regardless of line-ending style — a limitation of how that app's
@@ -409,10 +414,10 @@ async function send() {
       }
     }
   } else {
-    downloadFile(lastFilledPdfBytes, lastFilledFilename);
+    downloadFile(lastGeneratedImageBlob, lastFilledFilename);
     attachments.forEach((file) => downloadFile(file, file.name));
     window.location.href = buildMailtoUrl({ to: building.adminEmail, subject, body });
-    sendStatus.textContent = 'Downloaded the PDF, ID photos, and house rules photo, and opened a Mail draft — attach the downloaded files.';
+    sendStatus.textContent = 'Downloaded the permit image, ID photos, and house rules photo, and opened a Mail draft — attach the downloaded files.';
   }
 }
 
@@ -439,11 +444,11 @@ loadSavedDefaults();
 ownerNameEl.addEventListener('change', persistDefaults);
 ownerMobileEl.addEventListener('change', persistDefaults);
 unitSelect.addEventListener('change', persistDefaults);
-registeredGuestEl.addEventListener('input', invalidateGeneratedPdf);
-stayFromEl.addEventListener('input', invalidateGeneratedPdf);
-stayToEl.addEventListener('input', invalidateGeneratedPdf);
-unitSelect.addEventListener('input', invalidateGeneratedPdf);
-ownerNameEl.addEventListener('input', invalidateGeneratedPdf);
+registeredGuestEl.addEventListener('input', invalidateGeneratedPermit);
+stayFromEl.addEventListener('input', invalidateGeneratedPermit);
+stayToEl.addEventListener('input', invalidateGeneratedPermit);
+unitSelect.addEventListener('input', invalidateGeneratedPermit);
+ownerNameEl.addEventListener('input', invalidateGeneratedPermit);
 addCompanionRow();
 
 let resizeDebounce;
@@ -456,7 +461,7 @@ window.addEventListener('resize', () => {
     // DevTools panel toggling) don't change sigPad's width and shouldn't
     // discard a signature the host already drew.
     if (resizeCanvas()) {
-      invalidateGeneratedPdf();
+      invalidateGeneratedPermit();
     }
   }, 200);
 });

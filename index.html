@@ -21,14 +21,14 @@
   .card h2{font-size:14.5px; margin:0 0 12px;}
   .field{margin-bottom:12px;}
   .field label{display:block; font-size:12.5px; font-weight:600; color:#3a3f52; margin-bottom:5px;}
+  .hint{font-size:12px; color:var(--muted); margin-top:6px;}
   .row{display:flex; gap:12px; flex-wrap:wrap;}
   .row .field{flex:1 1 140px;}
   input[type=text], input[type=date], input[type=tel], select{width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:8px; font-size:16px; background:#fff; color:var(--text); font-family:inherit;}
   input[type=date]{min-height:40px;}
   input:focus, select:focus{outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent);}
-  .companion-row{display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
-  .companion-row input[type=text]{flex:1 1 100%;}
-  .companion-row input[type=file]{flex:1 1 auto; min-width:0; font-size:13px;}
+  .companion-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .companion-row input[type=text]{flex:1 1 auto;}
   .companion-row button{flex:0 0 auto;}
   button{font-family:inherit; cursor:pointer;}
   .btn{padding:9px 16px; border-radius:9px; border:1px solid var(--border); background:#fff; font-size:13.5px; font-weight:600; color:var(--text);}
@@ -70,16 +70,21 @@
       <label for="registeredGuest">Registered guest name</label>
       <input type="text" id="registeredGuest" placeholder="Full name">
     </div>
-    <div class="field">
-      <label for="registeredGuestId">Registered guest's ID photo</label>
-      <input type="file" id="registeredGuestId" accept="image/*">
-    </div>
   </div>
 
   <div class="card">
     <h2>Other companions <span style="font-weight:400;color:var(--muted)">(optional)</span></h2>
     <div id="companionsList"></div>
     <button class="btn small" id="addCompanionBtn" type="button">+ Add companion</button>
+  </div>
+
+  <div class="card">
+    <h2>Guest IDs &amp; Signed House Rules</h2>
+    <div class="field">
+      <label for="attachmentsInput">Select all guest ID photos and the signed house rules photo together</label>
+      <input type="file" id="attachmentsInput" accept="image/*" multiple>
+      <div id="attachmentsSummary" class="hint"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -106,17 +111,9 @@
   </div>
 
   <div class="card">
-    <h2>Signed House Rules</h2>
-    <div class="field">
-      <label for="houseRulesPhoto">Photo of the guest-signed house rules</label>
-      <input type="file" id="houseRulesPhoto" accept="image/*">
-    </div>
-  </div>
-
-  <div class="card">
     <button class="btn primary" id="generateBtn" type="button">Generate permit</button>
     <div id="genStatus" class="status" aria-live="polite"></div>
-    <a id="pdfDownloadLink" class="download-link" style="display:none" download>Download filled PDF</a>
+    <a id="pdfDownloadLink" class="download-link" style="display:none" download>Download filled permit image</a>
   </div>
 
   <div class="card">

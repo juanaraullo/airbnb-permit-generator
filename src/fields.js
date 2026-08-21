@@ -8,7 +8,7 @@ export function parseIsoDateLocal(isoDateStr) {
 }
 
 export function buildFilename({ unit, stayFromIso }) {
-  return `Guest Info Sheet - Unit ${unit} - ${stayFromIso}.pdf`;
+  return `Guest Info Sheet - Unit ${unit} - ${stayFromIso}.png`;
 }
 
 export function buildEmailSubject({ subjectCode, unit, stayFromLong, stayToLong }) {
@@ -41,6 +41,12 @@ export function buildEmailBody({ ownerName, ownerMobile, unit, buildingName, sta
   ].join(NL);
 }
 
-export function missingGuestIds(guests) {
-  return guests.filter((g) => !g.hasId).map((g) => (g.name ? g.name : '(unnamed guest)'));
+// Attachments are now a single combined multi-select (guest ID photos +
+// signed house rules together), so individual photos can no longer be tied
+// to a specific guest. The best guardrail available is a count check: you
+// need at least one ID photo per named guest, plus one for the house rules.
+// Returns how many more photos are needed (0 if there are already enough).
+export function attachmentsShortfall(guestCount, attachmentCount) {
+  const required = guestCount + 1;
+  return Math.max(0, required - attachmentCount);
 }

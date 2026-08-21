@@ -1,7 +1,7 @@
 export function canShareFiles(nav) {
   if (!nav || typeof nav.share !== 'function' || typeof nav.canShare !== 'function') return false;
   try {
-    const probe = new File(['x'], 'probe.pdf', { type: 'application/pdf' });
+    const probe = new File(['x'], 'probe.png', { type: 'image/png' });
     return nav.canShare({ files: [probe] }) === true;
   } catch {
     return false;

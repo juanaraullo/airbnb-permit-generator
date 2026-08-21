@@ -6,7 +6,7 @@ import {
   buildFilename,
   buildEmailSubject,
   buildEmailBody,
-  missingGuestIds,
+  attachmentsShortfall,
 } from '../src/fields.js';
 
 test('formatDateLong renders a human date', () => {
@@ -20,9 +20,9 @@ test('parseIsoDateLocal avoids UTC day-shift', () => {
   assert.equal(d.getDate(), 20);
 });
 
-test('buildFilename includes unit and stay date, no illegal characters', () => {
+test('buildFilename includes unit and stay date, ends in .png', () => {
   const name = buildFilename({ unit: '24J', stayFromIso: '2026-08-20' });
-  assert.equal(name, 'Guest Info Sheet - Unit 24J - 2026-08-20.pdf');
+  assert.equal(name, 'Guest Info Sheet - Unit 24J - 2026-08-20.png');
 });
 
 test('buildEmailSubject follows the "CODE; room unit; from-to" format', () => {
@@ -55,11 +55,10 @@ test('buildEmailBody includes stay dates, host contact, and a numbered guest lis
   );
 });
 
-test('missingGuestIds returns names of guests without a photo', () => {
-  const missing = missingGuestIds([
-    { name: 'Juan Dela Cruz', hasId: true },
-    { name: 'Maria Santos', hasId: false },
-    { name: '', hasId: false },
-  ]);
-  assert.deepEqual(missing, ['Maria Santos', '(unnamed guest)']);
+test('attachmentsShortfall requires one photo per guest plus one for house rules', () => {
+  assert.equal(attachmentsShortfall(2, 3), 0); // exactly enough (2 guests + 1 house rules)
+  assert.equal(attachmentsShortfall(2, 5), 0); // more than enough
+  assert.equal(attachmentsShortfall(2, 1), 2); // 2 short
+  assert.equal(attachmentsShortfall(1, 0), 2); // 0 photos, 1 guest -> need 2
+  assert.equal(attachmentsShortfall(0, 0), 1); // no guests, still need house rules
 });
