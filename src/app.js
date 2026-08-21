@@ -383,30 +383,34 @@ async function send() {
 
   if (canShareFiles(navigator)) {
     // Some mail apps' iOS share extensions (observed with Gmail) ignore the
-    // Web Share API's `title` and instead auto-fill the email subject from
-    // the shared file's own filename. Naming the shared image after the
-    // subject itself makes that fallback behavior produce the right
-    // subject too, without affecting the separate, human-friendly filename
-    // used for the direct-download link/fallback path below.
+    // Web Share API's `title` entirely and instead auto-fill the email
+    // subject from the shared *document* file's own filename — but only
+    // for document-type attachments (PDF, etc). A shared *image* doesn't
+    // get that treatment (photo filenames are usually meaningless, like
+    // IMG_1234, so mail apps reasonably don't use them as a subject), so
+    // naming the PNG after the subject — unlike when this app generated a
+    // PDF — doesn't reliably produce a subject anymore. Kept anyway since
+    // it's harmless and may still help on some platforms, but the clipboard
+    // copy below is the actual reliable fix.
     const shareImageFile = new File([lastGeneratedImageBlob], `${subject}.png`, { type: 'image/png' });
     try {
       await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: body });
-      // Several mail apps' share extensions (observed with Gmail on iOS)
-      // collapse every line break in the shared text into a single space,
-      // regardless of line-ending style — a limitation of how that app's
-      // compose screen ingests shared content, not something fixable from
-      // here. Copying the correctly-formatted body to the clipboard right
-      // away means it's already in hand to paste over whatever the app
-      // auto-filled, no extra tap needed.
+      // Since the subject can no longer be relied on to carry over at all,
+      // put it straight on the clipboard so it's one paste away — the
+      // Subject field is usually the first thing in a mail compose screen,
+      // so this covers the most common case in one action. The body (which
+      // still has its own line-break-collapsing issue in some apps) stays
+      // available via the separate Copy body button rather than fighting
+      // over the single clipboard slot.
       let clipboardNote = '';
       try {
-        await navigator.clipboard.writeText(body);
-        clipboardNote = " The properly-formatted body is also copied to your clipboard — if the app you picked squished it into one paragraph, paste over it.";
+        await navigator.clipboard.writeText(subject);
+        clipboardNote = " The subject is copied to your clipboard — paste it into the Subject field, since the app you picked may have left it blank or wrong.";
       } catch {
         // Clipboard write can fail (permissions, focus) — the on-screen
-        // Copy body button still covers this, so just skip the note.
+        // Copy subject button still covers this, so just skip the note.
       }
-      sendStatus.textContent = `Shared. Pick your mail app, then paste in the subject/recipient shown below.${clipboardNote}`;
+      sendStatus.textContent = `Shared.${clipboardNote} If the body looks squished together, tap Copy body below and paste over it too.`;
     } catch (err) {
       if (err.name !== 'AbortError') {
         sendStatus.textContent = 'Share failed: ' + err.message;
