@@ -243,6 +243,7 @@ function invalidateGeneratedPermit() {
   lastGeneratedImageBlob = null;
   lastFilledFilename = '';
   sendBtn.disabled = true;
+  openMailBtn.disabled = true;
   downloadLink.style.display = 'none';
 }
 
@@ -250,6 +251,7 @@ async function generate() {
   genStatus.textContent = '';
   genStatus.className = 'status';
   sendBtn.disabled = true;
+  openMailBtn.disabled = true;
 
   if (!registeredGuestEl.value.trim() || !stayFromEl.value || !stayToEl.value) {
     genStatus.textContent = 'Guest name and both stay dates are required.';
@@ -304,6 +306,7 @@ async function generate() {
   genStatus.textContent = `Generated "${lastFilledFilename}".`;
   persistDefaults();
   sendBtn.disabled = false;
+  openMailBtn.disabled = false;
 }
 
 generateBtn.addEventListener('click', () => {
@@ -320,6 +323,13 @@ const subjectText = document.getElementById('subjectText');
 const copyAdminEmailBtn = document.getElementById('copyAdminEmailBtn');
 const copySubjectBtn = document.getElementById('copySubjectBtn');
 const copyBodyBtn = document.getElementById('copyBodyBtn');
+const openMailBtn = document.getElementById('openMailBtn');
+
+// Web Share (and therefore file attachments) isn't available on most
+// desktop browsers — don't offer a button that can only ever fail there.
+if (!canShareFiles(navigator)) {
+  sendBtn.style.display = 'none';
+}
 
 let lastEmailBody = '';
 
@@ -332,20 +342,24 @@ function downloadFile(bytesOrFile, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-async function send() {
+// Validates the form and builds the subject/body/attachments needed to
+// send, shared by both the Share-sheet path and the direct-mailto path
+// below. Returns null (after setting an error status) if anything's
+// missing; otherwise returns everything the caller needs.
+function prepareSend() {
   sendStatus.textContent = '';
   sendStatus.className = 'status';
 
   if (!lastGeneratedImageBlob) {
     sendStatus.textContent = 'Generate the permit first.';
     sendStatus.className = 'status err';
-    return;
+    return null;
   }
 
   if (!registeredGuestEl.value.trim() || !stayFromEl.value || !stayToEl.value) {
     sendStatus.textContent = 'Guest name and both stay dates are required.';
     sendStatus.className = 'status err';
-    return;
+    return null;
   }
 
   const guestNames = collectGuestNames();
@@ -354,7 +368,7 @@ async function send() {
   if (shortfall > 0) {
     sendStatus.textContent = `Select ${shortfall} more photo${shortfall === 1 ? '' : 's'} — you need one ID photo per guest (${guestNames.length}) plus the signed house rules.`;
     sendStatus.className = 'status err';
-    return;
+    return null;
   }
 
   const stayFromLong = formatDateLong(parseIsoDateLocal(stayFromEl.value));
@@ -381,48 +395,63 @@ async function send() {
   lastEmailBody = body;
   emailBox.style.display = '';
 
-  if (canShareFiles(navigator)) {
-    // Some mail apps' iOS share extensions (observed with Gmail) ignore the
-    // Web Share API's `title` entirely and instead auto-fill the email
-    // subject from the shared *document* file's own filename — but only
-    // for document-type attachments (PDF, etc). A shared *image* doesn't
-    // get that treatment (photo filenames are usually meaningless, like
-    // IMG_1234, so mail apps reasonably don't use them as a subject), so
-    // naming the PNG after the subject — unlike when this app generated a
-    // PDF — doesn't reliably produce a subject anymore. Kept anyway since
-    // it's harmless and may still help on some platforms, but the clipboard
-    // copy below is the actual reliable fix.
-    const shareImageFile = new File([lastGeneratedImageBlob], `${subject}.png`, { type: 'image/png' });
-    try {
-      await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: body });
-      // Since the subject can no longer be relied on to carry over at all,
-      // put it straight on the clipboard so it's one paste away — the
-      // Subject field is usually the first thing in a mail compose screen,
-      // so this covers the most common case in one action. The body (which
-      // still has its own line-break-collapsing issue in some apps) stays
-      // available via the separate Copy body button rather than fighting
-      // over the single clipboard slot.
-      let clipboardNote = '';
-      try {
-        await navigator.clipboard.writeText(subject);
-        clipboardNote = " The subject is copied to your clipboard — paste it into the Subject field, since the app you picked may have left it blank or wrong.";
-      } catch {
-        // Clipboard write can fail (permissions, focus) — the on-screen
-        // Copy subject button still covers this, so just skip the note.
-      }
-      sendStatus.textContent = `Shared.${clipboardNote} If the body looks squished together, tap Copy body below and paste over it too.`;
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        sendStatus.textContent = 'Share failed: ' + err.message;
-        sendStatus.className = 'status err';
-      }
-    }
-  } else {
-    downloadFile(lastGeneratedImageBlob, lastFilledFilename);
-    attachments.forEach((file) => downloadFile(file, file.name));
-    window.location.href = buildMailtoUrl({ to: building.adminEmail, subject, body });
-    sendStatus.textContent = 'Downloaded the permit image, ID photos, and house rules photo, and opened a Mail draft — attach the downloaded files.';
+  return { subject, body, attachments };
+}
+
+async function send() {
+  const prepared = prepareSend();
+  if (!prepared) return;
+  const { subject, body, attachments } = prepared;
+
+  if (!canShareFiles(navigator)) {
+    sendStatus.textContent = 'Web Share isn\'t available in this browser — use "Open Mail app" below instead.';
+    sendStatus.className = 'status err';
+    return;
   }
+
+  // Confirmed via real-world reports (other developers hit the exact same
+  // wall — Web Share API `title` is well-documented as unreliable through
+  // Gmail's iOS *share extension* specifically, with no fix available from
+  // web code; this is a platform limitation, not something introduced by
+  // this app). Naming the shared file after the subject was worth trying
+  // (kept, harmless) but isn't a real fix — the "Open Mail app" button
+  // below uses a mailto: link instead, a completely different integration
+  // point that every mail app (including Gmail) handles reliably for
+  // subject/body, at the cost of not auto-attaching files.
+  const shareImageFile = new File([lastGeneratedImageBlob], `${subject}.png`, { type: 'image/png' });
+  try {
+    await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: body });
+    let clipboardNote = '';
+    try {
+      await navigator.clipboard.writeText(subject);
+      clipboardNote = " The subject is copied to your clipboard in case it's blank — paste it into the Subject field.";
+    } catch {
+      // Clipboard write can fail (permissions, focus) — Copy subject below still covers this.
+    }
+    sendStatus.textContent = `Shared.${clipboardNote} If the subject or spacing is wrong, "Open Mail app" below gets both right (you'll attach the downloaded photos yourself).`;
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      sendStatus.textContent = 'Share failed: ' + err.message;
+      sendStatus.className = 'status err';
+    }
+  }
+}
+
+// Uses mailto: instead of the Share Sheet — a different integration point
+// in every mail app (including Gmail), which reliably fills the subject
+// and body since it's just parsing a standard URL, not depending on an
+// app's own share-extension code. The trade-off: mailto: can't attach
+// files (a hard platform limit, not fixable from a website), so this
+// downloads everything first for the host to attach by hand.
+function openMailDirectly() {
+  const prepared = prepareSend();
+  if (!prepared) return;
+  const { subject, body, attachments } = prepared;
+
+  downloadFile(lastGeneratedImageBlob, lastFilledFilename);
+  attachments.forEach((file) => downloadFile(file, file.name));
+  window.location.href = buildMailtoUrl({ to: building.adminEmail, subject, body });
+  sendStatus.textContent = 'Downloaded the permit image, ID photos, and house rules photo, and opened a Mail draft with the subject and body correctly filled in — attach the downloaded files.';
 }
 
 sendBtn.addEventListener('click', () => {
@@ -430,6 +459,15 @@ sendBtn.addEventListener('click', () => {
     sendStatus.textContent = 'Something went wrong: ' + err.message;
     sendStatus.className = 'status err';
   });
+});
+
+openMailBtn.addEventListener('click', () => {
+  try {
+    openMailDirectly();
+  } catch (err) {
+    sendStatus.textContent = 'Something went wrong: ' + err.message;
+    sendStatus.className = 'status err';
+  }
 });
 
 copyAdminEmailBtn.addEventListener('click', () => navigator.clipboard.writeText(building.adminEmail));
