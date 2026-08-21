@@ -386,7 +386,22 @@ async function send() {
     const sharePdfFile = new File([lastFilledPdfBytes], `${subject}.pdf`, { type: 'application/pdf' });
     try {
       await navigator.share({ files: [sharePdfFile, ...attachments], title: subject, text: body });
-      sendStatus.textContent = 'Shared. Pick Mail, then paste in the subject/recipient shown below.';
+      // Several mail apps' share extensions (observed with Gmail on iOS)
+      // collapse every line break in the shared text into a single space,
+      // regardless of line-ending style — a limitation of how that app's
+      // compose screen ingests shared content, not something fixable from
+      // here. Copying the correctly-formatted body to the clipboard right
+      // away means it's already in hand to paste over whatever the app
+      // auto-filled, no extra tap needed.
+      let clipboardNote = '';
+      try {
+        await navigator.clipboard.writeText(body);
+        clipboardNote = " The properly-formatted body is also copied to your clipboard — if the app you picked squished it into one paragraph, paste over it.";
+      } catch {
+        // Clipboard write can fail (permissions, focus) — the on-screen
+        // Copy body button still covers this, so just skip the note.
+      }
+      sendStatus.textContent = `Shared. Pick your mail app, then paste in the subject/recipient shown below.${clipboardNote}`;
     } catch (err) {
       if (err.name !== 'AbortError') {
         sendStatus.textContent = 'Share failed: ' + err.message;
