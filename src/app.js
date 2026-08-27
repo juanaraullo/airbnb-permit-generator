@@ -105,6 +105,21 @@ function attachSignaturePad() {
   });
 }
 
+// Draws a signature image onto the pad, scaled to fit while preserving
+// aspect ratio. Shared by the manual upload flow and by restoring a
+// previously saved signature on page load.
+function drawSignatureImage(img) {
+  const ratio = window.devicePixelRatio || 1;
+  const boxW = sigPad.width / ratio;
+  const boxH = sigPad.height / ratio;
+  sigCtx.clearRect(0, 0, boxW, boxH);
+  const scale = Math.min(boxW / img.width, boxH / img.height, 1);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  sigCtx.drawImage(img, (boxW - w) / 2, (boxH - h) / 2, w, h);
+  sigHasStrokes = true;
+}
+
 // Draws an uploaded signature image onto the pad, scaled to fit while
 // preserving aspect ratio, so a host can use a consistent pre-made
 // e-signature instead of redrawing one by hand each time.
@@ -121,21 +136,22 @@ function loadSignatureImageFile(file) {
       genStatus.className = 'status err';
     };
     img.onload = () => {
-      const ratio = window.devicePixelRatio || 1;
-      const boxW = sigPad.width / ratio;
-      const boxH = sigPad.height / ratio;
-      sigCtx.clearRect(0, 0, boxW, boxH);
-      const scale = Math.min(boxW / img.width, boxH / img.height, 1);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      sigCtx.drawImage(img, (boxW - w) / 2, (boxH - h) / 2, w, h);
-      sigHasStrokes = true;
+      drawSignatureImage(img);
       invalidateGeneratedPermit();
     };
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
   sigUpload.value = '';
+}
+
+// Restores a signature saved from a previous session (drawn or uploaded)
+// so a host doesn't have to re-sign on every visit — once registered, it
+// stays registered until they hit Clear.
+function restoreSavedSignature(dataUrl) {
+  const img = new Image();
+  img.onload = () => drawSignatureImage(img);
+  img.src = dataUrl;
 }
 
 function signaturePngBytes() {
@@ -148,6 +164,11 @@ function signaturePngBytes() {
   return bytes;
 }
 
+// Signature restoration is deferred until after the canvas has been sized
+// (see the init block at the bottom of this file) — drawing into it any
+// earlier would be wiped out by that first resize.
+let pendingSignatureDataUrl = '';
+
 function loadSavedDefaults() {
   const defaults = loadDefaults(window.localStorage);
   ownerNameEl.value = defaults.ownerName;
@@ -156,6 +177,7 @@ function loadSavedDefaults() {
     setBuilding(defaults.buildingKey, { resetGuests: false });
   }
   if (defaults.unit && building.units.includes(defaults.unit)) unitSelect.value = defaults.unit;
+  pendingSignatureDataUrl = defaults.signaturePngDataUrl || '';
 }
 
 function persistDefaults() {
@@ -619,7 +641,10 @@ updateBuildingUI();
 // canvas mid-layout (e.g. during a container/viewport still resizing) and
 // permanently lock in a too-small drawing buffer, since there's no other
 // trigger to re-measure until a later window resize.
-requestAnimationFrame(() => requestAnimationFrame(resizeCanvas));
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  resizeCanvas();
+  if (pendingSignatureDataUrl) restoreSavedSignature(pendingSignatureDataUrl);
+}));
 attachSignaturePad();
 loadSavedDefaults();
 ownerNameEl.addEventListener('change', persistDefaults);
