@@ -12,7 +12,6 @@ test('uptown building has the expected shape', () => {
   assert.deepEqual(uptown.units, ['24J', '8T']);
   assert.equal(uptown.adminEmail, 'clientcare.uptownparksuites@asia-affinity.com');
   assert.equal(uptown.form.docType, 'guestInfoSheet');
-  assert.equal(uptown.form.outputFormat, 'png');
   assert.equal(uptown.form.template, 'templates/uptown-guest-info.pdf');
   assert.equal(uptown.form.maxGuests, 6);
 });
@@ -34,13 +33,19 @@ test('air building has the expected shape', () => {
   assert.deepEqual(air.units, ['965', '1116', '2510', '3024', '4061', '4841']);
   assert.equal(air.adminEmail, 'air.admin@greenmist.ph');
   assert.equal(air.form.docType, 'guestAuthorizationForm');
-  assert.equal(air.form.outputFormat, 'pdf');
-  assert.equal(air.form.template, 'templates/air-gaf.pdf');
+  assert.equal(air.form.template, 'templates/air-gaf-blank.png');
   assert.equal(air.form.maxGuests, 4);
 });
 
 test('air field coordinates match the calibrated values', () => {
   const f = BUILDINGS.air.form.fields;
   assert.deepEqual(f.guestRows, { nameX: 128, proofIdX: 405, relationshipX: 483, startY: 588, rowH: 21, max: 4, size: 8 });
-  assert.deepEqual(f.signature, { x: 390, y: 60, w: 150, h: 20 });
+  assert.deepEqual(f.signature, { x: 365, y: 70, w: 155, h: 28 });
+  assert.deepEqual(f.ownerName, { x: 400, y: 65, size: 8 });
+  // size is shrunk from the printed form's default so a 4-digit unit (e.g.
+  // "4061") doesn't run into the printed "for" label ~18pt to its right.
+  assert.deepEqual(f.unit, { x: 483, y: 659, size: 6.5 });
+  // x is nudged past the printed ",20" (which spans x=237-249) so the
+  // 2-digit year doesn't draw on top of it.
+  assert.deepEqual(f.givenYear, { x: 250, y: 79, size: 7 });
 });

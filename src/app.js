@@ -327,9 +327,19 @@ buildingSelectEl.addEventListener('change', () => {
   persistDefaults();
 });
 
-import { fillGuestInfoSheet, fillGuestAuthorizationForm } from './filler.js';
+import { fillGuestInfoSheet } from './filler.js';
+import { fillGuestAuthorizationFormImage } from './image-filler.js';
 import { renderPdfPageToPngBlob } from './render.js';
 import { canShareFiles, buildMailtoUrl } from './share.js';
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Could not load ${src}`));
+    img.src = src;
+  });
+}
 
 const stayFromEl = document.getElementById('stayFrom');
 const stayToEl = document.getElementById('stayTo');
@@ -385,16 +395,17 @@ async function generate() {
 
   genStatus.textContent = 'Generating…';
 
-  const templateResp = await fetch(building.form.template);
-  const templateBytes = new Uint8Array(await templateResp.arrayBuffer());
-
   const stayFromLong = formatDateLong(parseIsoDateLocal(stayFromEl.value));
   const stayToLong = formatDateLong(parseIsoDateLocal(stayToEl.value));
   const now = new Date();
 
-  let filledPdfBytes;
+  let outputBlob;
   if (isGuestAuthorizationForm()) {
-    filledPdfBytes = await fillGuestAuthorizationForm(window.PDFLib, templateBytes, building.form, {
+    // Draws straight onto a pre-rendered blank snapshot of the template
+    // instead of filling+rendering the real PDF — see the comment on
+    // air.form in config.js for why.
+    const templateImage = await loadImage(building.form.template);
+    outputBlob = await fillGuestAuthorizationFormImage(templateImage, building.form, {
       tower: building.tower,
       unit: unitSelect.value,
       periodFrom: stayFromLong,
@@ -407,10 +418,12 @@ async function generate() {
       givenMonth: now.toLocaleDateString('en-US', { month: 'long' }),
       givenYear: String(now.getFullYear()).slice(-2),
       ownerName: ownerNameEl.value.trim(),
-      signaturePngBytes: sigBytes,
+      signatureImage: sigPad,
     });
   } else {
-    filledPdfBytes = await fillGuestInfoSheet(window.PDFLib, templateBytes, building.form, {
+    const templateResp = await fetch(building.form.template);
+    const templateBytes = new Uint8Array(await templateResp.arrayBuffer());
+    const filledPdfBytes = await fillGuestInfoSheet(window.PDFLib, templateBytes, building.form, {
       registeredGuest: registeredGuestEl.value.trim(),
       stayFrom: stayFromLong,
       stayTo: stayToLong,
@@ -421,16 +434,6 @@ async function generate() {
       companions: collectCompanionNames(),
       signaturePngBytes: sigBytes,
     });
-  }
-
-  let outputBlob;
-  if (building.form.outputFormat === 'pdf') {
-    // Some templates' embedded fonts send pdf.js's canvas renderer into a
-    // pathologically slow path (measured ~3.8 minutes on Air Residences'
-    // real template) — for those, skip rendering to a photo entirely and
-    // send the filled PDF itself.
-    outputBlob = new Blob([filledPdfBytes], { type: 'application/pdf' });
-  } else {
     const pdfjsLib = await loadPdfjs();
     // scale:2 renders at roughly print resolution so the photo stays sharp
     // and legible, not blurry when the admin views/prints it.
@@ -442,7 +445,7 @@ async function generate() {
     docTitle: building.form.title,
     unit: unitSelect.value,
     stayFromIso: stayFromEl.value,
-    extension: building.form.outputFormat,
+    extension: 'png',
   });
 
   if (currentImageUrl) {
@@ -567,18 +570,24 @@ async function send() {
 
   // Confirmed via real-world reports (other developers hit the exact same
   // wall — Web Share API `title` is well-documented as unreliable through
-  // Gmail's iOS *share extension* specifically, with no fix available from
-  // web code; this is a platform limitation, not something introduced by
-  // this app). Naming the shared file after the subject was worth trying
-  // (kept, harmless) but isn't a real fix — the "Open Mail app" button
-  // below uses a mailto: link instead, a completely different integration
-  // point that every mail app (including Gmail) handles reliably for
+  // several mail apps' iOS share extensions, notably Gmail and Fastmail,
+  // with no fix available from web code; this is a platform limitation, not
+  // something introduced by this app). Naming the shared file after the
+  // subject was worth trying (kept, harmless) but isn't a real fix — the
+  // "Open Mail app" button below uses a mailto: link instead, a completely
+  // different integration point that every mail app handles reliably for
   // subject/body, at the cost of not auto-attaching files.
-  const shareExtension = building.form.outputFormat;
-  const shareMimeType = shareExtension === 'pdf' ? 'application/pdf' : 'image/png';
-  const shareImageFile = new File([lastGeneratedFileBlob], `${subject}.${shareExtension}`, { type: shareMimeType });
+  const shareImageFile = new File([lastGeneratedFileBlob], `${subject}.png`, { type: 'image/png' });
+  // When `title` gets dropped, mail apps that land on an empty subject
+  // commonly fall back to using the first line of the shared text as the
+  // subject instead (this is exactly how "Hi," was showing up as the
+  // subject — the body's own first line). Leading the shared text with the
+  // subject itself hijacks that same fallback so the subject comes out
+  // right either way, at the cost of a redundant first line in the body if
+  // `title` *does* come through correctly.
+  const shareText = `${subject}\r\n\r\n${body}`;
   try {
-    await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: body });
+    await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: shareText });
     let clipboardNote = '';
     try {
       await navigator.clipboard.writeText(subject);

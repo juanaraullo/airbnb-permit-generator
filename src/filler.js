@@ -42,6 +42,13 @@ export async function fillGuestInfoSheet(PDFLib, templateBytes, formConfig, data
   return pdfDoc.save();
 }
 
+// No longer used to produce the app's actual Air Residences output (see
+// src/image-filler.js) — kept because this is the only way to verify the
+// formConfig.fields coordinates precisely, via pdf.js text-position
+// extraction in tests/filler.test.js. The canvas renderer draws pixels onto
+// an image and reuses these exact same coordinates, but pixels can't be
+// asserted on the same way, so this function's tests double as regression
+// coverage for that shared coordinate data.
 export async function fillGuestAuthorizationForm(PDFLib, templateBytes, formConfig, data) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   const pdfDoc = await PDFDocument.load(templateBytes);

@@ -120,7 +120,13 @@ test('fillGuestAuthorizationForm places tower, unit, dates, and guest rows at th
   assert.ok(items.some((it) => it.text.includes('Driver License')), 'second guest proof-of-ID not found');
   assert.ok(items.some((it) => it.text.includes('965')), 'unit not found');
   assert.ok(items.some((it) => it.text.includes('Aug 27, 2026')), 'period-from date not found');
-  assert.ok(items.some((it) => it.text.includes('John Yves Araullo')), 'owner name not found');
+
+  const ownerNameItem = items.find((it) => it.text.includes('John Yves Araullo'));
+  assert.ok(ownerNameItem, 'owner name not found in filled PDF');
+  // Regression guard for the owner-name/signature overlap bug: the name
+  // must sit near the calibrated y=65, clearly below where the signature
+  // box (y=70-98) starts, not crowded into the same few points as before.
+  assert.ok(Math.abs(ownerNameItem.y - 65) < 2, `expected owner name near y=65, got y=${ownerNameItem.y}`);
 });
 
 test('fillGuestAuthorizationForm caps guest rows at 4 and embeds a signature image', async () => {
