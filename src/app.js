@@ -563,31 +563,26 @@ async function send() {
   const { subject, body, attachments } = prepared;
 
   if (!canShareFiles(navigator)) {
-    sendStatus.textContent = 'Web Share isn\'t available in this browser — use "Open Mail app" below instead.';
+    sendStatus.textContent = 'Web Share isn\'t available in this browser — use "Open Mail app" instead.';
     sendStatus.className = 'status err';
     return;
   }
 
-  // Confirmed via real-world reports (other developers hit the exact same
-  // wall — Web Share API `title` is well-documented as unreliable through
-  // several mail apps' iOS share extensions, notably Gmail and Fastmail,
-  // with no fix available from web code; this is a platform limitation, not
-  // something introduced by this app). Naming the shared file after the
-  // subject was worth trying (kept, harmless) but isn't a real fix — the
-  // "Open Mail app" button below uses a mailto: link instead, a completely
-  // different integration point that every mail app handles reliably for
-  // subject/body, at the cost of not auto-attaching files.
+  // Gmail's iOS app mishandles shared subject/body when files are attached
+  // via the share sheet — confirmed both by direct testing here (subject
+  // dropped in one test, paragraph breaks flattened into one line in
+  // another) and by a multi-year, widely-reported bug in the react-native-
+  // share library (github.com/react-native-community/react-native-share,
+  // issue #414): experienced native-app developers with lower-level API
+  // access than a website has never found a working fix either, so this is
+  // treated as unfixable from here. Apple's own Mail app handles the exact
+  // same payload correctly (confirmed by testing) — "Open Mail app" above
+  // uses a mailto: link instead, a completely different integration point
+  // that bypasses Gmail's share extension entirely, at the cost of not
+  // auto-attaching files.
   const shareImageFile = new File([lastGeneratedFileBlob], `${subject}.png`, { type: 'image/png' });
-  // When `title` gets dropped, mail apps that land on an empty subject
-  // commonly fall back to using the first line of the shared text as the
-  // subject instead (this is exactly how "Hi," was showing up as the
-  // subject — the body's own first line). Leading the shared text with the
-  // subject itself hijacks that same fallback so the subject comes out
-  // right either way, at the cost of a redundant first line in the body if
-  // `title` *does* come through correctly.
-  const shareText = `${subject}\r\n\r\n${body}`;
   try {
-    await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: shareText });
+    await navigator.share({ files: [shareImageFile, ...attachments], title: subject, text: body });
     let clipboardNote = '';
     try {
       await navigator.clipboard.writeText(subject);
