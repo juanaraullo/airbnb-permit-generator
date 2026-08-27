@@ -595,7 +595,7 @@ async function send() {
     } catch {
       // Clipboard write can fail (permissions, focus) — Copy subject below still covers this.
     }
-    sendStatus.textContent = `Shared.${clipboardNote} If the subject or spacing is wrong, "Open Mail app" below gets both right (you'll attach the downloaded photos yourself).`;
+    sendStatus.textContent = `Shared.${clipboardNote} If you picked Gmail and the subject or paragraph spacing came out wrong, that's a known Gmail limitation — tap "Copy body" below and paste it in, or use "Open Mail app" instead for a cleanly formatted draft (you'll attach the downloaded photos yourself).`;
   } catch (err) {
     if (err.name !== 'AbortError') {
       sendStatus.textContent = 'Share failed: ' + err.message;

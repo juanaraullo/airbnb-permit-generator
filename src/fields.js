@@ -22,11 +22,14 @@ export function buildEmailSubject({ subjectTemplate, unit, stayFromLong, stayToL
 }
 
 export function buildEmailBody({ ownerName, ownerMobile, unit, buildingName, docTitle, stayFromLong, stayToLong, guestNames, requiresHouseRulesPhoto }) {
-  // \r\n rather than a bare \n: several mail apps' iOS share extensions
-  // (observed with Gmail) collapse single-\n line breaks in shared plain
-  // text into spaces, running every line into one paragraph. CRLF is the
-  // line ending plain-text mail bodies use per RFC 5322 and is preserved
-  // reliably where bare \n isn't.
+  // \r\n rather than a bare \n: it's the line ending plain-text mail bodies
+  // use per RFC 5322, and fixes the paragraph-squishing some iOS mail share
+  // extensions do with a bare \n. Confirmed this does NOT fix Gmail's iOS
+  // share extension specifically — it collapses every line into one
+  // paragraph regardless of line-ending style, a platform-level limitation
+  // of that share extension with no known web-code workaround (see the
+  // "Send" status message in app.js, which points to "Open Mail app" or
+  // "Copy body" as the reliable fallback for Gmail).
   const NL = '\r\n';
   const guestList = (guestNames || []).map((name, i) => `${i + 1}. ${name}`).join(NL);
   const attachmentsLine = requiresHouseRulesPhoto
