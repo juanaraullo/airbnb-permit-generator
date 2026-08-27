@@ -12,22 +12,23 @@ function fakeStorage() {
 
 test('loadDefaults returns empty defaults when nothing saved', () => {
   const defaults = loadDefaults(fakeStorage());
-  assert.deepEqual(defaults, { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '' });
+  assert.deepEqual(defaults, { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '', buildingKey: '' });
 });
 
 test('saveDefaults then loadDefaults round-trips', () => {
   const storage = fakeStorage();
-  saveDefaults({ ownerName: 'Juan Araullo', ownerMobile: '0917', unit: '24J', signaturePngDataUrl: 'data:image/png;base64,x' }, storage);
+  saveDefaults({ ownerName: 'Juan Araullo', ownerMobile: '0917', unit: '24J', signaturePngDataUrl: 'data:image/png;base64,x', buildingKey: 'air' }, storage);
   const loaded = loadDefaults(storage);
   assert.equal(loaded.ownerName, 'Juan Araullo');
   assert.equal(loaded.unit, '24J');
+  assert.equal(loaded.buildingKey, 'air');
 });
 
 test('loadDefaults recovers from corrupted stored JSON', () => {
   const storage = fakeStorage();
   storage.setItem('airbnb-permit-generator:defaults', '{not json');
   const loaded = loadDefaults(storage);
-  assert.deepEqual(loaded, { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '' });
+  assert.deepEqual(loaded, { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '', buildingKey: '' });
 });
 
 test('saveDefaults does not throw when storage.setItem fails', () => {

@@ -6,10 +6,15 @@ test('uptown building has the expected shape', () => {
   const uptown = BUILDINGS.uptown;
   assert.equal(uptown.name, 'Uptown Parksuites');
   assert.equal(uptown.tower, 'Tower 2');
-  assert.equal(uptown.subjectCode, 'UPS T2');
+  assert.equal(uptown.displayName, 'Uptown Parksuites Tower 2');
+  assert.equal(uptown.subjectTemplate, 'UPS T2; room {unit}; {dates}');
+  assert.equal(uptown.requiresHouseRulesPhoto, true);
   assert.deepEqual(uptown.units, ['24J', '8T']);
   assert.equal(uptown.adminEmail, 'clientcare.uptownparksuites@asia-affinity.com');
+  assert.equal(uptown.form.docType, 'guestInfoSheet');
+  assert.equal(uptown.form.outputFormat, 'png');
   assert.equal(uptown.form.template, 'templates/uptown-guest-info.pdf');
+  assert.equal(uptown.form.maxGuests, 6);
 });
 
 test('uptown field coordinates match the calibrated values', () => {
@@ -17,4 +22,25 @@ test('uptown field coordinates match the calibrated values', () => {
   assert.deepEqual(f.registeredGuest, { x: 197, y: 855, size: 10 });
   assert.deepEqual(f.companionRows, { x: 90, startY: 563, rowH: 19, max: 5, size: 9 });
   assert.deepEqual(f.signature, { x: 195, y: 256, w: 225, h: 26 });
+});
+
+test('air building has the expected shape', () => {
+  const air = BUILDINGS.air;
+  assert.equal(air.name, 'Air Residences');
+  assert.equal(air.tower, '1');
+  assert.equal(air.displayName, 'Air Residences');
+  assert.equal(air.subjectTemplate, 'AIR {unit} GAF ; {dates}');
+  assert.equal(air.requiresHouseRulesPhoto, false);
+  assert.deepEqual(air.units, ['965', '1116', '2510', '3024', '4061', '4841']);
+  assert.equal(air.adminEmail, 'air.admin@greenmist.ph');
+  assert.equal(air.form.docType, 'guestAuthorizationForm');
+  assert.equal(air.form.outputFormat, 'pdf');
+  assert.equal(air.form.template, 'templates/air-gaf.pdf');
+  assert.equal(air.form.maxGuests, 4);
+});
+
+test('air field coordinates match the calibrated values', () => {
+  const f = BUILDINGS.air.form.fields;
+  assert.deepEqual(f.guestRows, { nameX: 128, proofIdX: 405, relationshipX: 483, startY: 588, rowH: 21, max: 4, size: 8 });
+  assert.deepEqual(f.signature, { x: 390, y: 60, w: 150, h: 20 });
 });

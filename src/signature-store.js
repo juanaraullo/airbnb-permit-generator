@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'airbnb-permit-generator:defaults';
-const EMPTY_DEFAULTS = { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '' };
+const EMPTY_DEFAULTS = { ownerName: '', ownerMobile: '', unit: '', signaturePngDataUrl: '', buildingKey: '' };
 
 export function loadDefaults(storage) {
   const raw = storage.getItem(STORAGE_KEY);
